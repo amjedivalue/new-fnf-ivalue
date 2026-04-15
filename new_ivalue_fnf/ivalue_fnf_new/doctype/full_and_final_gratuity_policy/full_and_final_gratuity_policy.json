@@ -1,0 +1,62 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-14 02:02:12.388818",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "full_and_final_gratuity_policy_section",
+  "company",
+  "employment_type",
+  "gratuity_rule",
+  "leave_encashment_multiplier"
+ ],
+ "fields": [
+  {
+   "default": "iValue KSA",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "employment_type",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Employment Type",
+   "options": "Employment Type"
+  },
+  {
+   "fieldname": "gratuity_rule",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Gratuity Rule",
+   "options": "Gratuity Rule"
+  },
+  {
+   "fieldname": "leave_encashment_multiplier",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Leave Multiplier"
+  },
+  {
+   "fieldname": "full_and_final_gratuity_policy_section",
+   "fieldtype": "Section Break",
+   "label": "Full and Final Gratuity Policy"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-04-14 14:48:17.322522",
+ "modified_by": "Administrator",
+ "module": "iValue FnF new",
+ "name": "Full and Final Gratuity Policy",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

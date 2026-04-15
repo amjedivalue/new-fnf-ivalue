@@ -1,0 +1,73 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-14 02:09:53.176866",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "full_and_final_component_rule_section",
+  "company",
+  "component",
+  "display_label",
+  "entry_side",
+  "account"
+ ],
+ "fields": [
+  {
+   "default": "iValue KSA",
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "display_label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Display Label",
+   "options": "Company"
+  },
+  {
+   "description": "insert in paybels or recsvsbles",
+   "fieldname": "entry_side",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Entry Side",
+   "options": "Payable\nReceivable"
+  },
+  {
+   "columns": 1,
+   "fieldname": "account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Account",
+   "options": "Account"
+  },
+  {
+   "fieldname": "full_and_final_component_rule_section",
+   "fieldtype": "Section Break",
+   "label": "Full and Final Component Rule"
+  },
+  {
+   "fieldname": "component",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Component",
+   "options": "Full and Final Component"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-04-14 14:48:32.728290",
+ "modified_by": "Administrator",
+ "module": "iValue FnF new",
+ "name": "Full and Final Component Rule",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

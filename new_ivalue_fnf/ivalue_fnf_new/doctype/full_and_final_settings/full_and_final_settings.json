@@ -1,0 +1,59 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-04-12 16:28:51.798405",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "gratuity_settings_section",
+  "gratuity_policies",
+  "full_and_final_component_rule_section",
+  "component_rules"
+ ],
+ "fields": [
+  {
+   "fieldname": "gratuity_settings_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "full_and_final_component_rule_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "gratuity_policies",
+   "fieldtype": "Table",
+   "label": "Gratuity Policies",
+   "options": "Full and Final Gratuity Policy"
+  },
+  {
+   "fieldname": "component_rules",
+   "fieldtype": "Table",
+   "label": "Component Rules",
+   "options": "Full and Final Component Rule"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-04-14 15:11:52.896419",
+ "modified_by": "Administrator",
+ "module": "iValue FnF new",
+ "name": "Full and Final Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

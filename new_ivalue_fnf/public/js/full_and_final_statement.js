@@ -10,9 +10,37 @@ frappe.ui.form.on("Full and Final Statement", {
 
   refresh(frm) {
     clear_placeholder_rows(frm);
-  },
+  
+    // =========================================================
+    // زر مباشر لفتح الاعدادات
+    // =========================================================
 
+    var button = frm.add_custom_button(
+      "Settings",
+      function() {
+        frappe.set_route("Form", "Full and Final Settings");
+      }
+    );
+
+<<<<<<< Updated upstream
   employee(frm) {
+=======
+   
+    button.prepend('<i class="fa fa-cog"></i> ');
+
+  
+  
+  },
+employee(frm) {
+  if (!frm.doc.employee) {
+    clear_employee_related_data(frm);
+    return;
+  }
+
+  clear_placeholder_rows(frm);
+
+  setTimeout(() => {
+>>>>>>> Stashed changes
     clear_placeholder_rows(frm);
   },
 
@@ -33,10 +61,15 @@ function clear_placeholder_rows(frm) {
     "Leave Encashment"
   ]);
 
+<<<<<<< Updated upstream
   const receivablePlaceholders = new Set([
     "Employee Advance"
   ]);
 
+=======
+// Full and Final button
+function clear_placeholder_rows(frm) {
+>>>>>>> Stashed changes
   frm.doc.payables = (frm.doc.payables || []).filter((row) => {
     const isPlaceholder =
       payablePlaceholders.has(row.component) &&
@@ -57,4 +90,8 @@ function clear_placeholder_rows(frm) {
 
   frm.refresh_field("payables");
   frm.refresh_field("receivables");
+}
+
+function add_settings_button(frm) {
+
 }
