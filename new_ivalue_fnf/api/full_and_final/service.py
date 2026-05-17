@@ -525,9 +525,9 @@ def apply_document_header(doc, employee_data: dict):
     if not doc.date_of_joining:
         doc.date_of_joining = employee_data.get("date_of_joining")
 
-    if not doc.relieving_date:
-        doc.relieving_date = employee_data.get("relieving_date")
-
+    # if not doc.relieving_date:
+    #     doc.relieving_date = employee_data.get("relieving_date")
+    doc.relieving_date = employee_data.get("relieving_date")
 
 def apply_salary_snapshot(doc, assignment, salary_data: dict):
     doc.custom_company_currency = get_salary_currency_from_assignment(
@@ -881,7 +881,126 @@ def build_leave_encashment_rows(doc):
             },
         )
 
+# ============================================================
+# SECTION: Unpaid Leave Builder
+# ============================================================
 
+def get_unpaid_leave_types():
+    return frappe.get_all(
+        "Leave Type",
+        filters={"is_lwp": 1},
+        pluck="name",
+    )
+
+
+def get_unpaid_leave_days(employee: str, start_date, end_date) -> float:
+    if not employee or not start_date or not end_date:
+        return 0
+
+    unpaid_leave_types = get_unpaid_leave_types()
+
+    if not unpaid_leave_types:
+        log_trace("no unpaid leave types found")
+        return 0
+
+    leave_applications = frappe.get_all(
+        "Leave Application",
+        filters={
+            "employee": employee,
+            "leave_type": ["in", unpaid_leave_types],
+            "docstatus": 1,
+            "status": "Approved",
+            "from_date": ("<=", end_date),
+            "to_date": (">=", start_date),
+        },
+        fields=[
+            "name",
+            "leave_type",
+            "from_date",
+            "to_date",
+            "total_leave_days",
+        ],
+    )
+
+    total_unpaid_days = 0
+
+    for leave in leave_applications:
+        overlap_days = get_overlap_days(
+            leave.from_date,
+            leave.to_date,
+            start_date,
+            end_date,
+        )
+
+        total_days = get_total_days(
+            leave.from_date,
+            leave.to_date,
+        )
+
+        if total_days <= 0 or overlap_days <= 0:
+            continue
+
+        proportional_days = flt(
+            flt(leave.total_leave_days) * (flt(overlap_days) / flt(total_days)),
+            2,
+        )
+
+        total_unpaid_days += proportional_days
+
+    return flt(total_unpaid_days, 2)
+
+
+def build_unpaid_leave_receivable(doc):
+    setting_row = get_component_setting_for_company(doc.company, "Unpaid Leave")
+
+    if not setting_row:
+        log_trace("unpaid leave skipped because setting row is missing")
+        return
+
+    if not setting_row.is_enabled:
+        log_trace("unpaid leave skipped because disabled in settings")
+        return
+
+    month_start = get_month_first_day(doc.relieving_date)
+
+    if doc.date_of_joining and getdate(doc.date_of_joining) > month_start:
+        month_start = getdate(doc.date_of_joining)
+
+    unpaid_days = get_unpaid_leave_days(
+        employee=doc.employee,
+        start_date=month_start,
+        end_date=doc.relieving_date,
+    )
+
+    if unpaid_days <= 0:
+        log_trace("unpaid leave skipped because days are zero")
+        return
+
+    daily_rate = flt(flt(doc.custom_monthly_gross_salary) / 30, 2)
+    amount = flt(unpaid_days * daily_rate, 2)
+
+    if amount <= 0:
+        return
+
+    append_row(
+        doc=doc,
+        table_field="receivables",
+        component=setting_row.display_name or "Unpaid Leave",
+        amount=amount,
+        account=setting_row.account,
+        reference_document_type="Employee",
+        reference_document=doc.employee,
+        custom_number_of_days=unpaid_days,
+    )
+
+    log_trace(
+        "unpaid leave receivable row added",
+        {
+            "unpaid_days": unpaid_days,
+            "daily_rate": daily_rate,
+            "amount": amount,
+        },
+    )
 # ============================================================
 # SECTION 10: Gratuity Builder
 # ============================================================
@@ -1337,7 +1456,62 @@ def build_expense_claim_rows(doc):
 # SECTION 13: Manual Rows / Additional Salary Sync
 # ============================================================
 
+@frappe.whitelist()
+def get_employee_fnf_manual_rows(employee: str, company: str = None):
+    if not employee:
+        return {
+            "payables": [],
+            "receivables": [],
+        }
 
+    filters = {
+        "employee": employee,
+        "docstatus": 1,
+    }
+
+    if company:
+        filters["company"] = company
+
+    if frappe.db.has_column("Additional Salary", "custom_created_from_fnf"):
+        filters["custom_created_from_fnf"] = 1
+
+    rows = frappe.get_all(
+        "Additional Salary",
+        filters=filters,
+        fields=[
+            "name",
+            "salary_component",
+            "amount",
+            "type",
+            "payroll_date",
+            "company",
+        ],
+        order_by="creation asc",
+    )
+
+    payables = []
+    receivables = []
+
+    for row in rows:
+        row_data = {
+            "component": row.salary_component,
+            "amount": row.amount,
+            "status": "Settled",
+            "reference_document_type": "Additional Salary",
+            "reference_document": row.name,
+            "custom_is_manual_row": 1,
+        }
+
+        if row.type == "Earning":
+            payables.append(row_data)
+
+        elif row.type == "Deduction":
+            receivables.append(row_data)
+
+    return {
+        "payables": payables,
+        "receivables": receivables,
+    }
 def get_manual_row_type_from_table_name(table_name: str) -> str | None:
     if table_name == "Payables":
         return "Payables Manual Row"
@@ -1395,8 +1569,44 @@ def validate_salary_component_type(salary_component: str, expected_type: str):
             )
         )
 
+# @frappe.whitelist()
+# def ensure_employee_relieving_date(employee: str, relieving_date: str = None):
+#     if not employee:
+#         frappe.throw(_("Employee is required."))
+
+#     employee_relieving_date = frappe.db.get_value(
+#         "Employee",
+#         employee,
+#         "relieving_date",
+#     )
+
+#     if employee_relieving_date:
+#         return {
+#             "status": "ok",
+#             "relieving_date": employee_relieving_date,
+#         }
+
+#     if not relieving_date:
+#         frappe.throw(
+#             _("Set Relieving Date for Employee: {0}").format(employee)
+#         )
+
+#     frappe.db.set_value(
+#         "Employee",
+#         employee,
+#         "relieving_date",
+#         relieving_date,
+#         update_modified=False,
+#     )
+
+#     frappe.clear_cache(doctype="Employee", name=employee)
+
+#     return {
+#         "status": "updated",
+#         "relieving_date": relieving_date,
+#     }
 @frappe.whitelist()
-def ensure_employee_relieving_date(employee: str, relieving_date: str = None):
+def ensure_employee_relieving_date(employee: str):
     if not employee:
         frappe.throw(_("Employee is required."))
 
@@ -1406,30 +1616,14 @@ def ensure_employee_relieving_date(employee: str, relieving_date: str = None):
         "relieving_date",
     )
 
-    if employee_relieving_date:
-        return {
-            "status": "ok",
-            "relieving_date": employee_relieving_date,
-        }
-
-    if not relieving_date:
+    if not employee_relieving_date:
         frappe.throw(
-            _("Set Relieving Date for Employee: {0}").format(employee)
+            _("Please set Relieving Date on the Employee record first for Employee: {0}").format(employee)
         )
 
-    frappe.db.set_value(
-        "Employee",
-        employee,
-        "relieving_date",
-        relieving_date,
-        update_modified=False,
-    )
-
-    frappe.clear_cache(doctype="Employee", name=employee)
-
     return {
-        "status": "updated",
-        "relieving_date": relieving_date,
+        "status": "ok",
+        "relieving_date": employee_relieving_date,
     }
 @frappe.whitelist()
 def get_manual_row_defaults(
@@ -1860,6 +2054,8 @@ def populate_full_and_final_doc(doc, method=None):
     build_gratuity_payable(doc)
     build_monthly_additional_salary_rows(doc)
     build_employee_advance_rows(doc)
+    build_unpaid_leave_receivable(doc)
+
     build_leave_encashment_rows(doc)
 
     sync_manual_rows_to_additional_salary(doc)

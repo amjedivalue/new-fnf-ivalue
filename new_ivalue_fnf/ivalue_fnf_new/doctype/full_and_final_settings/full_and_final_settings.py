@@ -49,6 +49,12 @@ class FullandFinalSettings(Document):
                 "account": default_expense_account,
                 "is_enabled": 0,
             },
+               {
+        "component_key": "Unpaid Leave",
+        "display_name": "Unpaid Leave",
+        "is_enabled": 1,
+        "account": None,
+    },
             # {
             #     "component_key": "Expense Claim",
             #     "display_name": "Expense Claim",
