@@ -21,15 +21,6 @@
   "docstatus": 0,
   "doctype": "Workflow State",
   "icon": "",
-  "modified": "2026-04-05 11:15:09.750621",
-  "name": "Pending Supporting Services Director",
-  "style": "",
-  "workflow_state_name": "Pending Supporting Services Director"
- },
- {
-  "docstatus": 0,
-  "doctype": "Workflow State",
-  "icon": "",
   "modified": "2026-04-05 11:15:53.596209",
   "name": "Employee Sigen",
   "style": "",
@@ -43,6 +34,15 @@
   "name": "HR Manager",
   "style": "",
   "workflow_state_name": "HR Manager"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
+  "modified": "2026-04-05 11:15:09.750621",
+  "name": "Pending Supporting Services Director",
+  "style": "",
+  "workflow_state_name": "Pending Supporting Services Director"
  },
  {
   "docstatus": 0,

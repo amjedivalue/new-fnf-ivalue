@@ -2023,18 +2023,51 @@ def set_transaction_date(doc, method=None):
     log_trace("transaction date set", doc.transaction_date)
 
 
+# def validate_required_values(doc):
+#     if not doc.employee:
+#         log_trace("skip build because employee is empty")
+#         return False
+
+#     if not doc.relieving_date:
+#         log_trace("skip build because relieving_date is empty")
+#         return False
+
+#     return True
+
 def validate_required_values(doc):
     if not doc.employee:
         log_trace("skip build because employee is empty")
         return False
 
-    if not doc.relieving_date:
-        log_trace("skip build because relieving_date is empty")
-        return False
+    employee_data = frappe.db.get_value(
+        "Employee",
+        doc.employee,
+        [
+            "relieving_date",
+            "user_id",
+        ],
+        as_dict=True,
+    )
+
+    if not employee_data:
+        frappe.throw(
+            _("Employee data not found. Please select the employee again.")
+        )
+
+    if not employee_data.relieving_date:
+        frappe.throw(
+            _(
+                "This employee does not have a Relieving Date on the Employee record. "
+                "Please set the Relieving Date on the Employee record first, then save again."
+            )
+        )
+
+    doc.relieving_date = employee_data.relieving_date
+
+    if hasattr(doc, "custom_user_id") and employee_data.user_id:
+        doc.custom_user_id = employee_data.user_id
 
     return True
-
-
 def apply_service_period(doc):
     if not doc.date_of_joining or not doc.relieving_date:
         return

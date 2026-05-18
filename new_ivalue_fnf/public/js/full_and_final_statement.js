@@ -268,7 +268,7 @@ validate: async function (frm) {
         if (frm.doc.workflow_state !== "Employee Sigen" && frm.doc.workflow_state !== "HR User") {
             add_to_do(frm);
         } else if (frm.doc.workflow_state === "Employee Sigen") {
-            upload_on_zoho(frm);
+            // upload_on_zoho(frm);
         }
     }
 });
