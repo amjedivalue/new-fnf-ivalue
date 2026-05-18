@@ -32,7 +32,8 @@ frappe.ui.form.on("Full and Final Statement", {
     // Runs every time the form is refreshed.
     refresh: function (frm) {
         clear_placeholder_rows(frm);
-    lock_employee_field_when_manual_rows_exist(frm);
+        lock_employee_field_when_manual_rows_exist(frm);
+    lock_employee_field_after_save(frm);
 
         // add_full_and_final_settings_button(frm);
         // add_review_settlement_button(frm);
@@ -42,94 +43,106 @@ frappe.ui.form.on("Full and Final Statement", {
     },
 
     // Runs when the employee is selected and validates related documents.
-employee: async function (frm) {
-    if (frm._restoring_employee) {
-        return;
-    }
+    employee: async function (frm) {
+        if (frm._restoring_employee) {
+            return;
+        }
 
-    const saved_employee = await get_saved_document_employee(frm);
+        const saved_employee = await get_saved_document_employee(frm);
 
-    // Saved document: user cleared Employee field.
-    // Do not clear rows. Reload/open the saved document instead.
-    if (!frm.doc.employee) {
-        if (!frm.is_new() && saved_employee) {
+        // Saved document: user cleared Employee field.
+        // Do not clear rows. Reload/open the saved document instead.
+        if (!frm.doc.employee) {
+            if (!frm.is_new() && saved_employee) {
+                frappe.msgprint({
+                    title: __("Employee Cannot Be Cleared"),
+                    message: __(
+                        "This Full and Final Statement is already saved for employee {0}.<br><br>" +
+                        "The saved document will be reopened to protect settlement rows and manual rows.",
+                        [saved_employee]
+                    ),
+                    indicator: "orange"
+                });
+
+                frm._restoring_employee = true;
+
+                try {
+                    await frm.set_value("employee", saved_employee);
+                } finally {
+                    frm._restoring_employee = false;
+                }
+
+                frm.reload_doc();
+                return;
+            }
+
+            clear_employee_related_data(frm);
+            return;
+        }
+
+        const selected_employee = frm.doc.employee;
+
+        // Saved document: user selected the same employee again.
+        // Go back to the saved document and do not rebuild/clear tables.
+        if (!frm.is_new() && saved_employee && saved_employee === selected_employee) {
             frappe.msgprint({
-                title: __("Employee Cannot Be Cleared"),
+                title: __("Existing Full and Final Statement"),
                 message: __(
                     "This Full and Final Statement is already saved for employee {0}.<br><br>" +
-                    "The saved document will be reopened to protect settlement rows and manual rows.",
-                    [saved_employee]
+                    "Opening the saved document.",
+                    [selected_employee]
                 ),
                 indicator: "orange"
             });
-
-            frm._restoring_employee = true;
-
-            try {
-                await frm.set_value("employee", saved_employee);
-            } finally {
-                frm._restoring_employee = false;
-            }
 
             frm.reload_doc();
             return;
         }
 
-        clear_employee_related_data(frm);
-        return;
-    }
-
-    const selected_employee = frm.doc.employee;
-
-    // Saved document: user selected the same employee again.
-    // Go back to the saved document and do not rebuild/clear tables.
-    if (!frm.is_new() && saved_employee && saved_employee === selected_employee) {
-        frappe.msgprint({
-            title: __("Existing Full and Final Statement"),
-            message: __(
-                "This Full and Final Statement is already saved for employee {0}.<br><br>" +
-                "Opening the saved document.",
-                [selected_employee]
-            ),
-            indicator: "orange"
-        });
-
-        frm.reload_doc();
-        return;
-    }
-
-    // Saved document: user selected a different employee.
-    // Check if that employee already has another FnF document.
-    if (!frm.is_new() && saved_employee && saved_employee !== selected_employee) {
-        let existing_doc = await check_existing_full_and_final_for_selected_employee(
-            selected_employee,
-            ""
-        );
-
-        if (existing_doc) {
-            show_existing_full_and_final_dialog_for_employee(
-                frm,
+        // Saved document: user selected a different employee.
+        // Check if that employee already has another FnF document.
+        if (!frm.is_new() && saved_employee && saved_employee !== selected_employee) {
+            let existing_doc = await check_existing_full_and_final_for_selected_employee(
                 selected_employee,
-                existing_doc
+                ""
             );
+
+            if (existing_doc) {
+                show_existing_full_and_final_dialog_for_employee(
+                    frm,
+                    selected_employee,
+                    existing_doc
+                );
+                return;
+            }
+
+            frappe.msgprint({
+                title: __("Employee Cannot Be Changed"),
+                message: __(
+                    "This Full and Final Statement is already saved for employee {0}.<br><br>" +
+                    "Please create a new Full and Final Statement if you want to process another employee.",
+                    [saved_employee]
+                ),
+                indicator: "orange"
+            });
+
+            frm.reload_doc();
             return;
         }
 
-        frappe.msgprint({
-            title: __("Employee Cannot Be Changed"),
-            message: __(
-                "This Full and Final Statement is already saved for employee {0}.<br><br>" +
-                "Please create a new Full and Final Statement if you want to process another employee.",
-                [saved_employee]
-            ),
-            indicator: "orange"
-        });
 
-        frm.reload_doc();
-        return;
-    }
 
-    // New document flow.
+
+
+       // New document flow.
+// User may change employee before saving, so clear old employee data first.
+// New document flow.
+// User may change employee before saving, so clear old employee data first.
+frappe.dom.freeze(__("Loading employee settlement data..."));
+
+try {
+    await clear_employee_related_data_keep_employee(frm);
+
     let existing_doc = await check_existing_full_and_final(frm);
 
     if (existing_doc) {
@@ -137,31 +150,35 @@ employee: async function (frm) {
         return;
     }
 
+    // Always load employee data from Employee profile first.
+    await load_employee_basic_data(frm);
+
+    // Always force Relieving Date from Employee profile.
+    let has_relieving_date = await ensure_employee_relieving_date(frm);
+
+    if (!has_relieving_date) {
+        return;
+    }
+
+    // After employee data is loaded, validate Employee Separation.
     let employee_separation = await check_employee_separation(frm);
 
     if (!employee_separation) {
-        show_missing_employee_separation_message(frm);
+        await show_missing_employee_separation_message(frm);
         return;
     }
 
-    await load_employee_basic_data(frm);
+    // await fetch_fnf_manual_rows_from_additional_salary(frm);
 
-    if (!frm.doc.relieving_date) {
-        frappe.msgprint({
-            title: __("Missing Relieving Date"),
-            message: __("Please set Relieving Date on the Employee record first."),
-            indicator: "orange"
-        });
-
-        return;
-    }
-// await fetch_fnf_manual_rows_from_additional_salary(frm);
     await frm.set_value("custom_employee_separation", employee_separation.name);
 
     frm.refresh_field("custom_employee_separation");
     frm.refresh_field("relieving_date");
     frm.refresh_field("custom_user_id");
-},
+} finally {
+    frappe.dom.unfreeze();
+}
+    },
     // Runs when the company is changed and resets child table filters.
     company: function (frm) {
         set_child_table_account_filters(frm);
@@ -174,92 +191,66 @@ employee: async function (frm) {
     },
 
     // Runs before saving the document and validates required employee data.
-    validate: async function (frm) {
-        clear_placeholder_rows(frm);
+validate: async function (frm) {
+    clear_placeholder_rows(frm);
 
-        if (frm.doc.employee) {
-            let employee_separation = await check_employee_separation(frm);
+    if (!frm.doc.employee) {
+        return;
+    }
 
-            if (!employee_separation) {
-                frappe.msgprint({
-                    title: __("Employee Separation Required"),
-                    message: __(
-                        "Please create Employee Separation before saving this Full and Final Statement."
-                    ),
-                    indicator: "orange"
-                });
+    frappe.dom.freeze(__("Validating employee settlement data..."));
 
-                frappe.validated = false;
-                return;
-            }
+    try {
+        // Always load employee data before any validation.
+        // This guarantees Relieving Date comes from Employee Profile before save.
+        await load_employee_basic_data(frm);
 
-            await frm.set_value("custom_employee_separation", employee_separation.name);
+        let has_relieving_date = await ensure_employee_relieving_date(frm);
 
-            if (!frm.doc.custom_user_id || !frm.doc.relieving_date) {
-                await load_employee_basic_data(frm);
-            }
-
-            if (!frm.doc.employee) {
-                return;
-            }
-
-            let employee_response = await frappe.db.get_value(
-                "Employee",
-                frm.doc.employee,
-                [
-                    "relieving_date",
-                    "user_id"
-                ]
-            );
-
-            if (!employee_response || !employee_response.message) {
-                frappe.msgprint({
-                    title: __("Employee Not Found"),
-                    message: __("Could not load employee details. Please select the employee again."),
-                    indicator: "red"
-                });
-
-                frappe.validated = false;
-                return;
-            }
-
-           let employee = employee_response.message;
-
-if (employee.relieving_date) {
-    await frm.set_value("relieving_date", employee.relieving_date);
-}
-
-if (employee.user_id) {
-    await frm.set_value("custom_user_id", employee.user_id);
-}
-
-await ensure_employee_relieving_date(frm);
-
-            if (!frm.doc.relieving_date) {
-                frappe.msgprint({
-                    title: __("Missing Relieving Date"),
-                    message: __("This employee does not have a Relieving Date. Please set the Relieving Date on the Employee record, then reselect the employee."),
-                    indicator: "orange"
-                });
-
-                frappe.validated = false;
-                return;
-            }
-
-            if (!frm.doc.custom_user_id) {
-                frappe.msgprint({
-                    title: __("Missing User ID"),
-                    message: __("This employee is not linked to a User. Please set the User ID on the Employee record, then reselect the employee."),
-                    indicator: "orange"
-                });
-
-                frappe.validated = false;
-                return;
-            }
+        if (!has_relieving_date) {
+            frappe.validated = false;
+            return;
         }
-    },
 
+        if (!frm.doc.custom_user_id) {
+            frappe.msgprint({
+                title: __("Missing User ID"),
+                message: __("This employee is not linked to a User. Please set the User ID on the Employee record, then reselect the employee."),
+                indicator: "orange"
+            });
+
+            frappe.validated = false;
+            return;
+        }
+
+        // Check Employee Separation after employee data is loaded.
+        let employee_separation = await check_employee_separation(frm);
+
+        if (!employee_separation) {
+            frappe.msgprint({
+                title: __("Employee Separation Required"),
+                message: __(
+                    "Please create Employee Separation before saving this Full and Final Statement."
+                ),
+                indicator: "orange"
+            });
+
+            frappe.validated = false;
+            return;
+        }
+
+        await frm.set_value("custom_employee_separation", employee_separation.name);
+    } finally {
+        frappe.dom.unfreeze();
+    }
+},
     before_workflow_action: async function (frm) {
+        if (
+            frm.doc.workflow_state === "Pending Finance Director" &&
+            frm.selected_workflow_action === "Approve"
+        ) {
+            validate_accounts_before_finance_approval(frm);
+        }
         if (frm.doc.workflow_state === "Pending Supporting Services Director") {
             if (frm.selected_workflow_action === "Approve") {
                 await check_if_separatoin_has_been_submited(frm)
@@ -355,6 +346,28 @@ function lock_employee_field_if_selected(frm) {
 
 //     return true;
 // }
+function validate_accounts_before_finance_approval(frm) {
+    let missing_accounts = [];
+
+    (frm.doc.payables || []).forEach(function (row) {
+        if (row.amount && !row.account) {
+            missing_accounts.push("Payables row #" + row.idx + " - " + row.component);
+        }
+    });
+
+    (frm.doc.receivables || []).forEach(function (row) {
+        if (row.amount && !row.account) {
+            missing_accounts.push("Receivables row #" + row.idx + " - " + row.component);
+        }
+    });
+
+    if (missing_accounts.length) {
+        frappe.throw(
+            __("Please fill Account for the following rows ") +
+            missing_accounts.join("<br>")
+        );
+    }
+}
 
 async function ensure_employee_relieving_date(frm) {
     if (!frm.doc.employee) {
@@ -518,7 +531,35 @@ function show_existing_full_and_final_dialog_for_employee(frm, employee, existin
     frappe.set_route("Form", "Full and Final Statement", existing_doc.name);
 }
 
-// Shows a message when a Full and Final Statement already exists for the employee.
+// // Shows a message when a Full and Final Statement already exists for the employee.
+// function show_existing_full_and_final_dialog(frm, existing_doc) {
+//     let employee = frm.doc.employee;
+
+//     frappe.msgprint({
+//         title: __("Full and Final Already Exists"),
+//         indicator: "orange",
+//         message: __(
+//             "A Full and Final Statement already exists for this employee.<br><br>" +
+//             "<b>Employee:</b> {0}<br>" +
+//             "<b>Document ID:</b> {1}<br>" +
+//             "<b>Workflow State:</b> {2}<br><br>" +
+//             "Please open the existing document instead of creating a new one."
+//         ).format(
+//             employee,
+//             existing_doc.name,
+//             existing_doc.workflow_state || "-"
+//         ),
+//         primary_action: {
+//             label: __("Open Existing Document"),
+//             action: function () {
+//                 frappe.set_route("Form", "Full and Final Statement", existing_doc.name);
+//             }
+//         }
+//     });
+
+//     frm.set_value("employee", "");
+//     clear_employee_header_data_only(frm);
+// }
 function show_existing_full_and_final_dialog(frm, existing_doc) {
     let employee = frm.doc.employee;
 
@@ -539,13 +580,17 @@ function show_existing_full_and_final_dialog(frm, existing_doc) {
         primary_action: {
             label: __("Open Existing Document"),
             action: function () {
-                frappe.set_route("Form", "Full and Final Statement", existing_doc.name);
+                frappe.set_route(
+                    "Form",
+                    "Full and Final Statement",
+                    existing_doc.name
+                );
             }
         }
     });
 
     frm.set_value("employee", "");
-    clear_employee_header_data_only(frm);
+    clear_employee_related_data(frm);
 }
 function clear_employee_header_data_only(frm) {
     frm.set_value("employee_name", "");
@@ -586,7 +631,7 @@ async function check_employee_separation(frm) {
 
 
 // Shows a message when the selected employee has no Employee Separation document.
-function show_missing_employee_separation_message(frm) {
+async function show_missing_employee_separation_message(frm) {
     let selected_employee = frm.doc.employee;
 
     frappe.msgprint({
@@ -605,17 +650,62 @@ function show_missing_employee_separation_message(frm) {
         }
     });
 
-    frm.set_value("employee", "");
+    await frm.set_value("employee", "");
     clear_employee_related_data(frm);
 }
+// ================================================================
+// SECTION 5: Employee Data cleaner
+// ================================================================
+async function clear_employee_related_data_keep_employee(frm) {
+    await frm.set_value({
+        employee_name: "",
+        company: "",
+        department: "",
+        designation: "",
+        date_of_joining: "",
+        relieving_date: "",
+        custom_user_id: "",
+        custom_employment_type: "",
 
+        custom_company_currency: "",
+        custom_letter_head: "",
+        custom_basic_salary: 0,
+        custom_housing: 0,
+        custom_transportation: 0,
+        custom_other_allowances: 0,
+        custom_monthly_gross_salary: 0,
 
+        custom_service_years: 0,
+        custom_service_month: 0,
+        custom_service_days: 0,
+        custom_total_of_years: 0,
+
+        total_payable_amount: 0,
+        total_receivable_amount: 0,
+        total_asset_recovery_cost: 0
+    });
+
+    frm.clear_table("payables");
+    frm.clear_table("receivables");
+    frm.clear_table("assets_allocated");
+
+    if (frm.fields_dict.custom_carry_forward_leaves) {
+        frm.clear_table("custom_carry_forward_leaves");
+        frm.refresh_field("custom_carry_forward_leaves");
+    }
+
+    frm.refresh_field("payables");
+    frm.refresh_field("receivables");
+    frm.refresh_field("assets_allocated");
+}
 // ================================================================
 // SECTION 5: Employee Data Loading and Clearing
 // ================================================================
 
 // Clears all employee-related fields and child tables from the form.
 function clear_employee_related_data(frm) {
+    frm.set_value("custom_user_id", "");
+    frm.set_value("custom_employment_type", "");
     frm.set_value("employee_name", "");
     frm.set_value("company", "");
     frm.set_value("department", "");
@@ -652,12 +742,13 @@ function clear_employee_related_data(frm) {
     frm.refresh_field("payables");
     frm.refresh_field("receivables");
     frm.refresh_field("assets_allocated");
+    frm.refresh_field("custom_user_id");
+    frm.refresh_field("custom_employment_type");
 }
 
 
 // Loads basic employee data from Employee into the Full and Final Statement form.
 async function load_employee_basic_data(frm) {
-    frappe.dom.freeze(__("Loading employee details..."));
 
     try {
         let response = await frappe.db.get_value(
@@ -705,14 +796,12 @@ async function load_employee_basic_data(frm) {
             message: __("Could not load employee details. Please try again."),
             indicator: "red"
         });
-    } finally {
-        frappe.dom.unfreeze();
-    }
+    } 
 }
 
 async function fetch_fnf_manual_rows_from_additional_salary(frm) {
-        return;
-    
+    return;
+
 
     let already_has_manual_rows =
         (frm.doc.payables || []).some(row => row.custom_is_manual_row) ||
@@ -1047,6 +1136,17 @@ function lock_employee_field_when_manual_rows_exist(frm) {
 
     frm.refresh_field("employee");
 }
+
+
+function lock_employee_field_after_save(frm) {
+    if (!frm.is_new() && frm.doc.employee) {
+        frm.set_df_property("employee", "read_only", 1);
+    } else {
+        frm.set_df_property("employee", "read_only", 0);
+    }
+
+    frm.refresh_field("employee");
+}
 // ================================================================
 // SECTION 10: Manual Row Defaults
 // ================================================================
@@ -1073,7 +1173,7 @@ function apply_manual_row_defaults(frm, cdt, cdn) {
 
     frappe.model.set_value(cdt, cdn, "custom_is_manual_row", 1);
     frappe.model.set_value(cdt, cdn, "status", "Settled");
-lock_employee_field_when_manual_rows_exist(frm);
+    lock_employee_field_when_manual_rows_exist(frm);
     let table_name = "Payables";
 
     if (row.parentfield === "receivables") {
@@ -1098,7 +1198,7 @@ lock_employee_field_when_manual_rows_exist(frm);
 
             frappe.model.set_value(cdt, cdn, "status", data.status);
             frappe.model.set_value(cdt, cdn, "custom_is_manual_row", data.custom_is_manual_row);
-                lock_employee_field_when_manual_rows_exist(frm);
+            lock_employee_field_when_manual_rows_exist(frm);
 
         },
         error: function () {
