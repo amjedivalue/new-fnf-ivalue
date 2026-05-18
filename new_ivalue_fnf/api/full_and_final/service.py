@@ -682,9 +682,8 @@ def apply_document_header(doc, employee_data: dict):
     if not doc.date_of_joining:
         doc.date_of_joining = employee_data.get("date_of_joining")
 
-    # if not doc.relieving_date:
-    #     doc.relieving_date = employee_data.get("relieving_date")
-    doc.relieving_date = employee_data.get("relieving_date")
+    if not doc.relieving_date:
+        doc.relieving_date = employee_data.get("relieving_date")
 
 def apply_salary_snapshot(doc, assignment, salary_data: dict):
     doc.custom_company_currency = get_salary_currency_from_assignment(
@@ -1784,26 +1783,7 @@ def validate_salary_component_type(salary_component: str, expected_type: str):
 #         "status": "updated",
 #         "relieving_date": relieving_date,
 #     }
-@frappe.whitelist()
-def ensure_employee_relieving_date(employee: str):
-    if not employee:
-        frappe.throw(_("Employee is required."))
 
-    employee_relieving_date = frappe.db.get_value(
-        "Employee",
-        employee,
-        "relieving_date",
-    )
-
-    if not employee_relieving_date:
-        frappe.throw(
-            _("Please set Relieving Date on the Employee record first for Employee: {0}").format(employee)
-        )
-
-    return {
-        "status": "ok",
-        "relieving_date": employee_relieving_date,
-    }
 @frappe.whitelist()
 def get_manual_row_defaults(
     company: str,
@@ -2039,11 +2019,18 @@ def validate_required_values(doc):
         log_trace("skip build because employee is empty")
         return False
 
+    if not doc.relieving_date:
+        frappe.throw(
+            _(
+                "Relieving Date is required on the Full and Final Statement. "
+                "Please set the Relieving Date on this document, then save again."
+            )
+        )
+
     employee_data = frappe.db.get_value(
         "Employee",
         doc.employee,
         [
-            "relieving_date",
             "user_id",
         ],
         as_dict=True,
@@ -2053,16 +2040,6 @@ def validate_required_values(doc):
         frappe.throw(
             _("Employee data not found. Please select the employee again.")
         )
-
-    if not employee_data.relieving_date:
-        frappe.throw(
-            _(
-                "This employee does not have a Relieving Date on the Employee record. "
-                "Please set the Relieving Date on the Employee record first, then save again."
-            )
-        )
-
-    doc.relieving_date = employee_data.relieving_date
 
     if hasattr(doc, "custom_user_id") and employee_data.user_id:
         doc.custom_user_id = employee_data.user_id

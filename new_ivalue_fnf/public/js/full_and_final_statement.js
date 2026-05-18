@@ -154,11 +154,11 @@ try {
     await load_employee_basic_data(frm);
 
     // Always force Relieving Date from Employee profile.
-    let has_relieving_date = await ensure_employee_relieving_date(frm);
+    // let has_relieving_date = await ensure_employee_relieving_date(frm);
 
-    if (!has_relieving_date) {
-        return;
-    }
+    // if (!has_relieving_date) {
+    //     return;
+    // }
 
     // After employee data is loaded, validate Employee Separation.
     let employee_separation = await check_employee_separation(frm);
@@ -205,12 +205,12 @@ validate: async function (frm) {
         // This guarantees Relieving Date comes from Employee Profile before save.
         await load_employee_basic_data(frm);
 
-        let has_relieving_date = await ensure_employee_relieving_date(frm);
+        // let has_relieving_date = await ensure_employee_relieving_date(frm);
 
-        if (!has_relieving_date) {
-            frappe.validated = false;
-            return;
-        }
+        // if (!has_relieving_date) {
+        //     frappe.validated = false;
+        //     return;
+        // }
 
         if (!frm.doc.custom_user_id) {
             frappe.msgprint({
@@ -268,7 +268,7 @@ validate: async function (frm) {
         if (frm.doc.workflow_state !== "Employee Sigen" && frm.doc.workflow_state !== "HR User") {
             add_to_do(frm);
         } else if (frm.doc.workflow_state === "Employee Sigen") {
-            // upload_on_zoho(frm);
+            upload_on_zoho(frm);
         }
     }
 });
@@ -369,42 +369,42 @@ function validate_accounts_before_finance_approval(frm) {
     }
 }
 
-async function ensure_employee_relieving_date(frm) {
-    if (!frm.doc.employee) {
-        return false;
-    }
+// async function ensure_employee_relieving_date(frm) {
+//     if (!frm.doc.employee) {
+//         return false;
+//     }
 
-    let employee_response = await frappe.db.get_value(
-        "Employee",
-        frm.doc.employee,
-        "relieving_date"
-    );
+//     let employee_response = await frappe.db.get_value(
+//         "Employee",
+//         frm.doc.employee,
+//         "relieving_date"
+//     );
 
-    if (
-        employee_response &&
-        employee_response.message &&
-        employee_response.message.relieving_date
-    ) {
-        await frm.set_value(
-            "relieving_date",
-            employee_response.message.relieving_date
-        );
+//     if (
+//         employee_response &&
+//         employee_response.message &&
+//         employee_response.message.relieving_date
+//     ) {
+//         await frm.set_value(
+//             "relieving_date",
+//             employee_response.message.relieving_date
+//         );
 
-        frm.refresh_field("relieving_date");
-        return true;
-    }
+//         frm.refresh_field("relieving_date");
+//         return true;
+//     }
 
-    await frm.set_value("relieving_date", "");
-    frm.refresh_field("relieving_date");
+//     await frm.set_value("relieving_date", "");
+//     frm.refresh_field("relieving_date");
 
-    frappe.msgprint({
-        title: __("Missing Relieving Date"),
-        message: __("Please set Relieving Date on the Employee record first."),
-        indicator: "orange"
-    });
+//     frappe.msgprint({
+//         title: __("Missing Relieving Date"),
+//         message: __("Please set Relieving Date on the Employee record first."),
+//         indicator: "orange"
+//     });
 
-    return false;
-}
+//     return false;
+// }
 
 // ================================================================
 // SECTION 2: Full and Final Outstanding Statement Child Table Events
@@ -1310,10 +1310,10 @@ function explain_selected_settlement_row(frm, target_table_field) {
         return;
     }
 
-    if (!frm.doc.relieving_date) {
-        frappe.msgprint(__("Please set Relieving Date first."));
-        return;
-    }
+    // if (!frm.doc.relieving_date) {
+    //     frappe.msgprint(__("Please set Relieving Date first."));
+    //     return;
+    // }
 
     frappe.call({
         method: "new_ivalue_fnf.api.full_and_final.service.explain_settlement_amount",

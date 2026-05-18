@@ -30,15 +30,6 @@
   "docstatus": 0,
   "doctype": "Workflow State",
   "icon": "",
-  "modified": "2025-12-10 16:10:50.368915",
-  "name": "HR Manager",
-  "style": "",
-  "workflow_state_name": "HR Manager"
- },
- {
-  "docstatus": 0,
-  "doctype": "Workflow State",
-  "icon": "",
   "modified": "2026-04-05 11:15:09.750621",
   "name": "Pending Supporting Services Director",
   "style": "",
@@ -48,10 +39,10 @@
   "docstatus": 0,
   "doctype": "Workflow State",
   "icon": "",
-  "modified": "2026-04-05 11:10:59.364134",
-  "name": "HR User",
+  "modified": "2025-12-10 16:10:50.368915",
+  "name": "HR Manager",
   "style": "",
-  "workflow_state_name": "HR User"
+  "workflow_state_name": "HR Manager"
  },
  {
   "docstatus": 0,
@@ -61,5 +52,14 @@
   "name": "Pending Finance Director",
   "style": "",
   "workflow_state_name": "Pending Finance Director"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Workflow State",
+  "icon": "",
+  "modified": "2026-04-05 11:10:59.364134",
+  "name": "HR User",
+  "style": "",
+  "workflow_state_name": "HR User"
  }
 ]
