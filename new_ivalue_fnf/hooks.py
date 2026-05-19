@@ -11,7 +11,8 @@ doc_events = {
     "Full and Final Statement": {
         "before_insert": "new_ivalue_fnf.api.full_and_final.service.set_transaction_date",
         "validate": "new_ivalue_fnf.api.full_and_final.service.populate_full_and_final_doc",
-        # "after_insert": "new_ivalue_fnf.api.full_and_final.service.enqueue_rebuild_after_first_insert",
+        "on_cancel": "new_ivalue_fnf.api.full_and_final.service.cancel_fnf_manual_additional_salaries",
+        "on_trash": "new_ivalue_fnf.api.full_and_final.service.cancel_fnf_manual_additional_salaries",
     }
 }
 

@@ -1952,7 +1952,36 @@ def sync_manual_rows_to_additional_salary(doc):
         table_name="Receivables",
     )
 
+def cancel_fnf_manual_additional_salaries_on_delete(doc, method=None):
+    for row in (doc.payables or []) + (doc.receivables or []):
+        reference_document_type = str(getattr(row, "reference_document_type", "") or "").strip()
+        reference_document = str(getattr(row, "reference_document", "") or "").strip()
 
+        if reference_document_type != "Additional Salary":
+            continue
+
+        if not reference_document:
+            continue
+
+        cancel_additional_salary_if_needed(reference_document)
+        
+def cancel_fnf_manual_additional_salaries(doc, method=None):
+    for row in (doc.payables or []) + (doc.receivables or []):
+        reference_document_type = str(
+            getattr(row, "reference_document_type", "") or ""
+        ).strip()
+
+        reference_document = str(
+            getattr(row, "reference_document", "") or ""
+        ).strip()
+
+        if reference_document_type != "Additional Salary":
+            continue
+
+        if not reference_document:
+            continue
+
+        cancel_additional_salary_if_needed(reference_document)
 def cancel_deleted_manual_additional_salary_rows(doc):
     old_doc = doc.get_doc_before_save()
 
@@ -2303,22 +2332,6 @@ def populate_full_and_final_doc(doc, method=None):
         },
     )
 
-
-def enqueue_rebuild_after_first_insert(doc, method=None):
-    """
-    بعد أول حفظ، نطلب من النظام يعمل إعادة بناء في الخلفية.
-
-    هذا يمنع ضغط السيرفر أثناء عملية الحفظ الأصلية.
-    """
-    frappe.enqueue(
-        method="new_ivalue_fnf.api.full_and_final.service.rebuild_saved_full_and_final_statement",
-        queue="short",
-        timeout=300,
-        enqueue_after_commit=True,
-        docname=doc.name,
-    )
-
-    log_trace("queued rebuild after first insert", doc.name)
 
 
 def rebuild_saved_full_and_final_statement(docname: str):
