@@ -106,9 +106,14 @@ def cancel_zoho_doc(name):
         status_child_table_name="Custody Status",
         zoho_id=doc.zoho_id,
     )
+    
+    # cancel_doc_type(name)
+    frappe.db.set_value("Full and Final Statement", doc.name, "workflow_state", "Cancel")
+    frappe.db.commit()
+    
     zoho_remove = zoho.remove_custody()
+    
     if zoho_remove["status"] == 200:
-        cancel_doc_type(name)
         return {"status": 201, "message": "recoreds has been deleted successfully"}
     else:
         return {"status": zoho_remove["status"], "message": zoho_remove["message"]}
@@ -131,9 +136,7 @@ def fetch_zoho_doc(name):
 
 
 def cancel_doc_type(name):
-    update_workflow_status = frappe.db.set_value(
-        "Full and Final Statement", name, "workflow_state", "Cancel"
-    )
+    frappe.db.set_value("Full and Final Statement", name, "workflow_state", "Cancel")
     frappe.db.commit()
 
 
@@ -338,13 +341,13 @@ def generate_and_attach_employee_separation_pdf(
         print_format=EMPLOYEE_SEPARATION_PRINT_FORMAT,
         as_pdf=True,
     )
-
+    #Khaled Jallad was here
     saved_file = save_file(
         fname=file_name,
         content=pdf_content,
         dt="Full and Final Statement",
         dn=full_and_final_doc.name,
-        is_private=1,
+        is_private=0,
     )
 
     return saved_file.name

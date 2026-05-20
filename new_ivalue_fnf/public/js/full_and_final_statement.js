@@ -31,6 +31,7 @@ frappe.ui.form.on("Full and Final Statement", {
 
     // Runs every time the form is refreshed.
     refresh: function (frm) {
+        //khaled Jallad was here
         if(frm.doc.workflow_state !== "Signed"){
             const acction_buttons = frm.page.wrapper.find(".custom-actions")
             acction_buttons.find('[data-label="Create%20Journal%20Entry"]').hide()
@@ -264,7 +265,7 @@ validate: async function (frm) {
     },
 
     // Runs before cancelling the document and cancels the Zoho document.
-    before_cancel: function (frm) {
+    after_cancel: function (frm) {
         remove_custody(frm);
     },
 
