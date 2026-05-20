@@ -200,7 +200,7 @@ def upload_on_zoho(name):
         docstatus=doc.docstatus
     )
     upload_zoho_doc = zoho.create_zoho_documnt()
-    if upload_zoho_doc["status"] == 201 or upload_zoho_doc["status"] == 200:
+    if upload_zoho_doc["status"] == 200:
         zoho_data = upload_zoho_doc['data']
         if zoho_data:
             doc.zoho_id = zoho_data['zoho_id']
@@ -216,7 +216,10 @@ def upload_on_zoho(name):
                 })
                 idx += 1
         doc.save(ignore_permissions=True)
-        frappe.db.commit()        
+        frappe.db.commit() 
+
+        return {"status": 201, "message": "Zoho documnt has been uploaded successfully"}
+    elif upload_zoho_doc["status"] == 201:
         return {"status": 201, "message": "Zoho documnt has been uploaded successfully"}
     else:
         frappe.throw(upload_zoho_doc["message"])
