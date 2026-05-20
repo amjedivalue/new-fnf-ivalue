@@ -1462,9 +1462,9 @@ function add_test_employee_separation_pdf_sync_button(frm) {
         return;
     }
 
-    frm.add_custom_button(__("Test Separation PDF Sync"), function () {
-        sync_employee_separation_pdf_to_full_and_final(frm);
-    });
+    // frm.add_custom_button(__("Test Separation PDF Sync"), function () {
+    //     sync_employee_separation_pdf_to_full_and_final(frm);
+    // });
 }
 
 

@@ -39,7 +39,8 @@ def add_assigened_to(name, workflow_state):
             status = "Supporting Services Director"
         case "HR Manager":
             status = "HR Manager"
-
+        case "Accountant":
+            status = "Accounts User"
     # Get all users who have this role
     users = frappe.db.sql(
         """
@@ -128,6 +129,7 @@ def fetch_zoho_doc(name):
         name=doc.name,
         status_child_table_name="Custody Status",
         zoho_id=doc.zoho_id,
+        docstatus=doc.docstatus
     )
     zoho_status = zoho.fetch_zoho_status()
     if zoho_status["status"] == 200:
@@ -195,9 +197,26 @@ def upload_on_zoho(name):
         zoho_doc_name=zoho_documnt_name,
         company=doc.company,
         status_child_table_name=child_table,
+        docstatus=doc.docstatus
     )
     upload_zoho_doc = zoho.create_zoho_documnt()
-    if upload_zoho_doc["status"] == 201:
+    if upload_zoho_doc["status"] == 201 or upload_zoho_doc["status"] == 200:
+        zoho_data = upload_zoho_doc['data']
+        if zoho_data:
+            doc.zoho_id = zoho_data['zoho_id']
+            idx = 1
+            for item in zoho_data['request_action']:
+                doc.append("custom_zoho_status", {
+                    'action_id':item['action_id'],
+                        'recipient_name':item['recipient_name'],
+                        'recipient_email':item['recipient_email'],
+                        'action_type':item['action_type'],
+                        'action_status':item['action_status'],
+                        "idx": idx
+                })
+                idx += 1
+        doc.save(ignore_permissions=True)
+        frappe.db.commit()        
         return {"status": 201, "message": "Zoho documnt has been uploaded successfully"}
     else:
         frappe.throw(upload_zoho_doc["message"])
