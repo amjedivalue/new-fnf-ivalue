@@ -98,6 +98,7 @@ fixtures = [
                 [
                     "HR User",
                     "HR Manager",
+                    "Accountant", 
                     "Pending Finance Director",
                     "Pending Supporting Services Director",
                     "Employee Sigen",

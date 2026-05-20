@@ -31,6 +31,11 @@ frappe.ui.form.on("Full and Final Statement", {
 
     // Runs every time the form is refreshed.
     refresh: function (frm) {
+        if(frm.doc.workflow_state !== "Signed"){
+            const acction_buttons = frm.page.wrapper.find(".custom-actions")
+            acction_buttons.find('[data-label="Create%20Journal%20Entry"]').hide()
+        }
+
         clear_placeholder_rows(frm);
         lock_employee_field_when_manual_rows_exist(frm);
     lock_employee_field_after_save(frm);
