@@ -1,6 +1,5 @@
 [
  {
-  "custom_workflow_type_field": null,
   "docstatus": 0,
   "doctype": "Workflow",
   "document_type": "Full and Final Statement",
@@ -20,7 +19,6 @@
     "parent": "Full and final Statement",
     "parentfield": "states",
     "parenttype": "Workflow",
-    "send_email": 0,
     "state": "HR User",
     "update_field": null,
     "update_value": null,
@@ -36,7 +34,6 @@
     "parent": "Full and final Statement",
     "parentfield": "states",
     "parenttype": "Workflow",
-    "send_email": 0,
     "state": "HR Manager",
     "update_field": null,
     "update_value": null,
@@ -52,7 +49,6 @@
     "parent": "Full and final Statement",
     "parentfield": "states",
     "parenttype": "Workflow",
-    "send_email": 1,
     "state": "Accountant",
     "update_field": null,
     "update_value": null,
@@ -68,7 +64,6 @@
     "parent": "Full and final Statement",
     "parentfield": "states",
     "parenttype": "Workflow",
-    "send_email": 0,
     "state": "Pending Finance Director",
     "update_field": null,
     "update_value": null,
@@ -84,7 +79,6 @@
     "parent": "Full and final Statement",
     "parentfield": "states",
     "parenttype": "Workflow",
-    "send_email": 0,
     "state": "Pending Supporting Services Director",
     "update_field": null,
     "update_value": null,
@@ -100,7 +94,6 @@
     "parent": "Full and final Statement",
     "parentfield": "states",
     "parenttype": "Workflow",
-    "send_email": 0,
     "state": "Employee Sigen",
     "update_field": null,
     "update_value": null,
@@ -116,7 +109,6 @@
     "parent": "Full and final Statement",
     "parentfield": "states",
     "parenttype": "Workflow",
-    "send_email": 0,
     "state": "Signed",
     "update_field": null,
     "update_value": null,
@@ -132,7 +124,6 @@
     "parent": "Full and final Statement",
     "parentfield": "states",
     "parenttype": "Workflow",
-    "send_email": 0,
     "state": "Cancel",
     "update_field": null,
     "update_value": null,
@@ -149,7 +140,6 @@
     "parent": "Full and final Statement",
     "parentfield": "transitions",
     "parenttype": "Workflow",
-    "send_email_to_creator": 0,
     "state": "HR User",
     "workflow_builder_id": null
    },
@@ -162,7 +152,6 @@
     "parent": "Full and final Statement",
     "parentfield": "transitions",
     "parenttype": "Workflow",
-    "send_email_to_creator": 0,
     "state": "HR Manager",
     "workflow_builder_id": null
    },
@@ -175,7 +164,6 @@
     "parent": "Full and final Statement",
     "parentfield": "transitions",
     "parenttype": "Workflow",
-    "send_email_to_creator": 0,
     "state": "HR Manager",
     "workflow_builder_id": null
    },
@@ -188,7 +176,6 @@
     "parent": "Full and final Statement",
     "parentfield": "transitions",
     "parenttype": "Workflow",
-    "send_email_to_creator": 0,
     "state": "Accountant",
     "workflow_builder_id": null
    },
@@ -201,7 +188,6 @@
     "parent": "Full and final Statement",
     "parentfield": "transitions",
     "parenttype": "Workflow",
-    "send_email_to_creator": 0,
     "state": "Accountant",
     "workflow_builder_id": null
    },
@@ -214,7 +200,6 @@
     "parent": "Full and final Statement",
     "parentfield": "transitions",
     "parenttype": "Workflow",
-    "send_email_to_creator": 0,
     "state": "Pending Finance Director",
     "workflow_builder_id": null
    },
@@ -227,7 +212,6 @@
     "parent": "Full and final Statement",
     "parentfield": "transitions",
     "parenttype": "Workflow",
-    "send_email_to_creator": 0,
     "state": "Pending Finance Director",
     "workflow_builder_id": null
    },
@@ -240,7 +224,6 @@
     "parent": "Full and final Statement",
     "parentfield": "transitions",
     "parenttype": "Workflow",
-    "send_email_to_creator": 0,
     "state": "Pending Supporting Services Director",
     "workflow_builder_id": null
    },
@@ -253,7 +236,6 @@
     "parent": "Full and final Statement",
     "parentfield": "transitions",
     "parenttype": "Workflow",
-    "send_email_to_creator": 0,
     "state": "Pending Supporting Services Director",
     "workflow_builder_id": null
    }
