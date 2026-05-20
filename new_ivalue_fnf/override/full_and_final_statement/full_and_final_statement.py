@@ -145,6 +145,7 @@ def update_workfow_status(doc, zoho_status):
         frappe.db.set_value(
             "Full and Final Statement", doc.name, "workflow_state", "Signed"
         )
+        frappe.db.set_value("Full and Final Statement", doc.name, "docstatus", 1)
         frappe.db.commit()
         return "completed"
     elif zoho_status == "declined":
