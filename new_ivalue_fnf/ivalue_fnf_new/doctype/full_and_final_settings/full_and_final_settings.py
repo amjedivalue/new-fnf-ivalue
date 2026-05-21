@@ -144,7 +144,7 @@ class FullandFinalSettings(Document):
                     "component_key": "Gratuity",
                     "display_name": "Gratuity",
                     "account": gratuity_account,
-                    "is_enabled": 0,
+                    "is_enabled": 1,
                 }
             )
 

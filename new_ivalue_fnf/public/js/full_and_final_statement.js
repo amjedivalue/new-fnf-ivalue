@@ -1383,7 +1383,12 @@ function build_amount_explanation_html(data) {
     }).join("");
 
     return `
-        <div style="font-size: 13px;">
+<div style="
+    font-size: 13px;
+    max-height: 70vh;
+    overflow-y: auto;
+    padding-right: 6px;
+">
             <div style="
                 padding: 14px;
                 border: 1px solid var(--border-color);

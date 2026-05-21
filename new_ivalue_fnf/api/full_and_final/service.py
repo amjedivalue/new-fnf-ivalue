@@ -998,6 +998,32 @@ def build_leave_encashment_rows(doc):
         )
         balance = flt(earned - taken, 2)
 
+
+
+# ===========================================new added
+        today_date = doc.transaction_date or nowdate()
+
+        days_difference = max(
+            date_diff(doc.relieving_date, today_date) ,
+            0,
+        )
+
+        days_in_relieving_month = get_days_in_month(doc.relieving_date)
+
+        assigned_leave_days = flt(allocation.total_leaves_allocated)
+
+        additional_leave_balance = flt(
+            (assigned_leave_days / 12 / days_in_relieving_month) * days_difference,
+            2,
+        )
+
+        balance = flt(balance + additional_leave_balance, 2)
+
+#============================================new added
+
+
+
+
         if balance <= 0:
             continue
 
@@ -1213,11 +1239,14 @@ def is_saudi_gratuity_allowed(
         return False
 
     if normalize_text(reason_of_leaving) not in [
-        "End of contract",
-        "Termination",
         "Resignation",
+        "Non renew contract",
+        "End of Contract by Mutual Agreement",
+            "Termination under Article 77",
+
     ]:
         return False
+
 
     return True
 
@@ -1336,7 +1365,9 @@ def apply_resignation_rule(
     - من 5 إلى أقل من 10: ثلثين المكافأة
     - 10 سنوات فأكثر: كامل المكافأة
     """
-    if normalize_text(reason_of_leaving) != "Resignation":
+    if normalize_text(reason_of_leaving) not in [
+        "Resignation",
+    ]:
         return flt(amount, 2)
 
     if service_years < 2:
@@ -2619,76 +2650,238 @@ def explain_leave_amount(
     )
 
     regular_leave_taken = flt(taken_leaves - personal_leave_days, 2)
-    remaining_leaves = flt(earned_leaves - taken_leaves, 2)
+
+    old_remaining_leaves = flt(earned_leaves - taken_leaves, 2)
+
+    today_date = doc.transaction_date or nowdate()
+
+    days_difference = max(
+        date_diff(doc.relieving_date, today_date) ,
+        0,
+    )
+
+    days_in_relieving_month = get_days_in_month(doc.relieving_date)
+    assigned_leave_days = flt(allocation.total_leaves_allocated, 2)
+
+    monthly_leave_accrual = flt(assigned_leave_days / 12, 4)
+
+    daily_leave_accrual = flt(
+        monthly_leave_accrual / days_in_relieving_month,
+        4,
+    )
+
+    additional_leave_balance = flt(
+        daily_leave_accrual * days_difference,
+        2,
+    )
+
+    remaining_leaves = flt(old_remaining_leaves + additional_leave_balance, 2)
+
 
     return {
         "title": component or "Leave Encashment",
-        "summary": "This amount is calculated from carry-forward leave balance after deducting approved leave applications and personal leave.",
-        "lines": [
-            {
-                "label": "Leave Allocation",
-                "value": reference_document,
-            },
-            {
-                "label": "Leave Type",
-                "value": allocation.leave_type or "-",
-            },
-            {
-                "label": "Allocation Period",
-                "value": "{0} to {1}".format(
-                    allocation.from_date,
-                    allocation.to_date,
-                ),
-            },
-            {
-                "label": "Allocated Leaves",
-                "value": flt(allocation.total_leaves_allocated, 2),
-            },
-            {
-                "label": "Extra Days",
-                "value": flt(allocation.extra_days, 2),
-            },
-            {
-                "label": "Total Earned Leaves",
-                "value": earned_leaves,
-            },
-            {
-                "label": "Taken From Leave Applications",
-                "value": regular_leave_taken,
-            },
-            {
-                "label": "Personal Leave",
-                "value": format_leave_days_as_days_and_hours(personal_leave_days),
-            },
-            {
-                "label": "Total Taken Leaves",
-                "value": format_leave_days_as_days_and_hours(taken_leaves),
-            },
-            {
-                "label": "Remaining Leave Balance",
-                "value": format_leave_days_as_days_and_hours(remaining_leaves),
-            },
-            {
-                "label": "Monthly Gross Salary",
-                "value": monthly_salary,
-            },
-            {
-                "label": "Daily Rate",
-                "value": "{0} / 30 = {1}".format(monthly_salary, daily_rate),
-            },
-            {
-                "label": "Formula",
-                "value": "{0} × {1} = {2}".format(
-                    daily_rate,
-                    remaining_leaves,
-                    amount,
-                ),
-            },
-            {
-                "label": "Final Amount",
-                "value": amount,
-            },
-        ],
+"summary": "Leave encashment equals the existing leave balance plus prorated leave earned after the current date used on this statement until the relieving date.",
+       "lines": [
+    {
+        "label": "Leave Allocation",
+        "value": reference_document,
+    },
+    {
+        "label": "Leave Type",
+        "value": allocation.leave_type or "-",
+    },
+    {
+        "label": "Allocated Leaves",
+        "value": flt(allocation.total_leaves_allocated, 2),
+    },
+    {
+        "label": "Extra Days",
+        "value": flt(allocation.extra_days, 2),
+    },
+    {
+        "label": "Total Leave Taken",
+        "value": taken_leaves,
+    },
+    {
+        "label": "Existing Leave Balance Formula",
+        "value": "({0} + {1}) - {2} = {3}".format(
+            flt(allocation.total_leaves_allocated, 2),
+            flt(allocation.extra_days, 2),
+            taken_leaves,
+            old_remaining_leaves,
+        ),
+    },
+    {
+        "label": "Current Date Used",
+        "value": today_date,
+    },
+    {
+        "label": "Relieving Date",
+        "value": doc.relieving_date,
+    },
+{
+    "label": "Proration Basis",
+    "value": "Current Date is already included in system leave balance",
+},
+{
+    "label": "Proration Days Used",
+    "value": "{0} days after {1} until {2}".format(
+        days_difference,
+        today_date,
+        doc.relieving_date,
+    ),
+},
+
+{
+    "label": "Proration Days Used",
+    "value": "{0} days".format(days_difference),
+},
+
+    {
+        "label": "Monthly Leave Accrual Formula",
+        "value": "{0} / 12 = {1}".format(
+            assigned_leave_days,
+            monthly_leave_accrual,
+        ),
+    },
+    {
+        "label": "Daily Leave Accrual Formula",
+        "value": "{0} / {1} = {2}".format(
+            monthly_leave_accrual,
+            days_in_relieving_month,
+            daily_leave_accrual,
+        ),
+    },
+    {
+        "label": "Prorated Leave Added Formula",
+        "value": "{0} x {1} days = {2}".format(
+            daily_leave_accrual,
+            days_difference,
+            additional_leave_balance,
+        ),
+    },
+    {
+        "label": "Final Leave Balance Formula",
+        "value": "{0} + {1} = {2}".format(
+            old_remaining_leaves,
+            additional_leave_balance,
+            remaining_leaves,
+        ),
+    },
+    {
+        "label": "Daily Salary Rate",
+        "value": "{0} / 30 = {1}".format(
+            monthly_salary,
+            daily_rate,
+        ),
+    },
+    {
+        "label": "Final Leave Amount Formula",
+        "value": "{0} x {1} = {2}".format(
+            daily_rate,
+            remaining_leaves,
+            amount,
+        ),
+    },
+    {
+        "label": "Final Amount",
+        "value": amount,
+    },
+],
+
+# 
+# 
+# "lines": [
+#             {
+#                 "label": "Leave Allocation",
+#                 "value": reference_document,
+#             },
+#             {
+#                 "label": "Leave Type",
+#                 "value": allocation.leave_type or "-",
+#             },
+#             {
+#                 "label": "Allocation Period",
+#                 "value": "{0} to {1}".format(
+#                     allocation.from_date,
+#                     allocation.to_date,
+#                 ),
+#             },
+#             {
+#                 "label": "Allocated Leaves",
+#                 "value": flt(allocation.total_leaves_allocated, 2),
+#             },
+#             {
+#                 "label": "Extra Days",
+#                 "value": flt(allocation.extra_days, 2),
+#             },
+#             {
+#                 "label": "Total Earned Leaves",
+#                 "value": earned_leaves,
+#             },
+#             {
+#                 "label": "Taken From Leave Applications",
+#                 "value": regular_leave_taken,
+#             },
+#             {
+#                 "label": "Personal Leave",
+#                 "value": format_leave_days_as_days_and_hours(personal_leave_days),
+#             },
+#             {
+#                 "label": "Total Taken Leaves",
+#                 "value": format_leave_days_as_days_and_hours(taken_leaves),
+#             },
+#             {
+#     "label": "Remaining Leave Balance Before Proration",
+#     "value": format_leave_days_as_days_and_hours(old_remaining_leaves),
+# },
+# {
+#     "label": "Relieving Month Days Used",
+#     "value": days_difference,
+# },
+# {
+#     "label": "Days in Relieving Month",
+#     "value": days_in_relieving_month,
+# },
+# {
+#     "label": "Prorated Leave Balance Added",
+#     "value": format_leave_days_as_days_and_hours(additional_leave_balance),
+# },
+# {
+#     "label": "Final Remaining Leave Balance",
+#     "value": format_leave_days_as_days_and_hours(remaining_leaves),
+# },
+
+#             {
+#                 "label": "Monthly Gross Salary",
+#                 "value": monthly_salary,
+#             },
+#             {
+#                 "label": "Daily Rate",
+#                 "value": "{0} / 30 = {1}".format(monthly_salary, daily_rate),
+#             },
+#            {
+#     "label": "Leave Balance Formula",
+#     "value": "{0} + {1} = {2}".format(
+#         old_remaining_leaves,
+#         additional_leave_balance,
+#         remaining_leaves,
+#     ),
+# },
+# {
+#     "label": "Amount Formula",
+#     "value": "{0} × {1} = {2}".format(
+#         daily_rate,
+#         remaining_leaves,
+#         amount,
+#     ),
+# },
+
+#             {
+#                 "label": "Final Amount",
+#                 "value": amount,
+#             },
+#         ],
     }
 def explain_unpaid_leave_application_amount(
     doc,
@@ -2996,15 +3189,27 @@ def explain_gratuity_amount(doc, component: str, amount: float):
         service_days_count,
     )
     monthly_salary = flt(getattr(doc, "custom_monthly_gross_salary", 0), 2)
+    total_service_days = (
+        (service_years_count * 360)
+        + (service_months_count * 30)
+        + service_days_count
+    )
 
-    first_five_years_amount = 0
-    remaining_years_amount = 0
+    first_five_years_days = min(total_service_days, 1800)
+    after_five_years_days = max(total_service_days - 1800, 0)
 
-    if service_years <= 5:
-        first_five_years_amount = flt(service_years * (monthly_salary / 2), 2)
-    else:
-        first_five_years_amount = flt(5 * (monthly_salary / 2), 2)
-        remaining_years_amount = flt((service_years - 5) * monthly_salary, 2)
+    first_five_years_daily_rate = flt((monthly_salary / 2) / 360, 6)
+    after_five_years_daily_rate = flt(monthly_salary / 360, 6)
+
+    first_five_years_amount = flt(
+        first_five_years_days * first_five_years_daily_rate,
+        2,
+    )
+
+    remaining_years_amount = flt(
+        after_five_years_days * after_five_years_daily_rate,
+        2,
+    )
 
     # base_amount = calculate_base_gratuity(
     #     service_years=service_years,
@@ -3049,34 +3254,79 @@ def explain_gratuity_amount(doc, component: str, amount: float):
                 "label": "Service Period",
                 "value": service_period_text,
             },
+            
             {
-                "label": "Service Years Used in Calculation",
-                "value": service_years,
-            },
+    "label": "Service Days Used in Calculation",
+    "value": "{0} × 360 + {1} × 30 + {2} = {3}".format(
+        service_years_count,
+        service_months_count,
+        service_days_count,
+        total_service_days,
+    ),
+},
+
+            
+            
             {
                 "label": "Monthly Gross Salary",
                 "value": monthly_salary,
             },
             {
-                "label": "First 5 Years Formula",
-                "value": "{0} × ({1} / 2) = {2}".format(
-                    min(service_years, 5),
-                    monthly_salary,
-                    first_five_years_amount,
-                ),
-            },
+    "label": "First 5 Years Days",
+    "value": "{0} days".format(first_five_years_days),
+},
+{
+    "label": "First 5 Years Daily Rate",
+    "value": "({0} / 2) / 360 = {1}".format(
+        monthly_salary,
+        first_five_years_daily_rate,
+    ),
+},
+{
+    "label": "First 5 Years Formula",
+    "value": "{0} × {1} = {2}".format(
+        first_five_years_days,
+        first_five_years_daily_rate,
+        first_five_years_amount,
+    ),
+},
+
             {
-                "label": "After 5 Years Formula",
-                "value": (
-                    "({0} - 5) × {1} = {2}".format(
-                        service_years,
-                        monthly_salary,
-                        remaining_years_amount,
-                    )
-                    if service_years > 5
-                    else "Not applicable"
-                ),
-            },
+    "label": "After 5 Years Days",
+    "value": "{0} days".format(after_five_years_days),
+},
+{
+    "label": "After 5 Years Daily Rate",
+    "value": "{0} / 360 = {1}".format(
+        monthly_salary,
+        after_five_years_daily_rate,
+    ),
+},
+{
+    "label": "After 5 Years Days",
+    "value": "{0} days".format(after_five_years_days),
+},
+{
+    "label": "After 5 Years Daily Rate",
+    "value": "{0} / 360 = {1}".format(
+        monthly_salary,
+        after_five_years_daily_rate,
+    ),
+},
+{
+    "label": "After 5 Years Formula",
+    "value": (
+        "{0} × {1} = {2}".format(
+            after_five_years_days,
+            after_five_years_daily_rate,
+            remaining_years_amount,
+        )
+        if after_five_years_days > 0
+        else "Not applicable"
+    ),
+},
+
+
             {
                 "label": "Base Gratuity Formula",
                 "value": "{0} + {1} = {2}".format(
@@ -3109,8 +3359,11 @@ def explain_gratuity_amount(doc, component: str, amount: float):
 
 
 def get_resignation_multiplier(service_years: float, reason_of_leaving: str) -> float:
-    if normalize_text(reason_of_leaving) != "Resignation":
+    if normalize_text(reason_of_leaving) not in [
+        "Resignation",
+    ]:
         return 1
+
 
     if service_years < 2:
         return 0
@@ -3125,21 +3378,23 @@ def get_resignation_multiplier(service_years: float, reason_of_leaving: str) -> 
 
 
 def get_resignation_rule_text(service_years: float, reason_of_leaving: str) -> str:
-    if normalize_text(reason_of_leaving) != "Resignation":
-        return "Full gratuity because reason of leaving is not Resignation."
+    if normalize_text(reason_of_leaving) not in [
+        "Resignation",
+    ]:
+        return "Full gratuity because reason of leaving does not use the resignation rule."
 
     if service_years < 2:
         return (
-            "Resignation with less than 2 years of service: employee is not eligible."
+            "Reason of leaving uses resignation rule with less than 2 years of service: employee is not eligible."
         )
 
     if service_years < 5:
-        return "Resignation from 2 to less than 5 years: employee gets one third of gratuity."
+        return "Reason of leaving uses resignation rule from 2 to less than 5 years: employee gets one third of gratuity."
 
     if service_years < 10:
-        return "Resignation from 5 to less than 10 years: employee gets two thirds of gratuity."
+        return "Reason of leaving uses resignation rule from 5 to less than 10 years: employee gets two thirds of gratuity."
 
-    return "Resignation with 10 years or more: employee gets full gratuity."
+    return "Reason of leaving uses resignation rule with 10 years or more: employee gets full gratuity."
 
 
 def explain_manual_row(doc, row_data: dict, table_field: str):
