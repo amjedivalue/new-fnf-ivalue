@@ -2143,6 +2143,41 @@ def validate_required_values(doc):
         doc.custom_user_id = employee_data.user_id
 
     return True
+# def apply_service_period(doc):
+#     if not doc.date_of_joining or not doc.relieving_date:
+#         return
+
+#     start_date = getdate(doc.date_of_joining)
+#     end_date = getdate(doc.relieving_date)
+
+#     if end_date < start_date:
+#         frappe.throw("Relieving Date cannot be before Date of Joining.")
+
+#     # difference = relativedelta(end_date + relativedelta(days=1), start_date)
+#     # total_days = (end_date - start_date).days + 1
+
+#     # doc.custom_service_years = difference.years
+#     # doc.custom_service_month = difference.months
+#     # doc.custom_service_days = difference.days
+#     # doc.custom_total_of_years = flt(total_days / 365, 6)
+#     # وحطّ هاد بدله
+#     difference = relativedelta(end_date, start_date)
+
+#     doc.custom_service_years = difference.years
+#     doc.custom_service_month = difference.months
+#     doc.custom_service_days = end_date.day
+#     doc.custom_total_of_years = flt(
+#         ((difference.years * 12) + difference.months + (end_date.day / 30)) / 12, 6
+#     )
+
+#     log_trace(
+#         "service period applied",
+#         {
+#             "years": doc.custom_service_years,
+#             "months": doc.custom_service_month,
+#             "days": doc.custom_service_days,
+#         },
+#     )
 def apply_service_period(doc):
     if not doc.date_of_joining or not doc.relieving_date:
         return
@@ -2153,21 +2188,20 @@ def apply_service_period(doc):
     if end_date < start_date:
         frappe.throw("Relieving Date cannot be before Date of Joining.")
 
-    # difference = relativedelta(end_date + relativedelta(days=1), start_date)
-    # total_days = (end_date - start_date).days + 1
-
-    # doc.custom_service_years = difference.years
-    # doc.custom_service_month = difference.months
-    # doc.custom_service_days = difference.days
-    # doc.custom_total_of_years = flt(total_days / 365, 6)
-    # وحطّ هاد بدله
-    difference = relativedelta(end_date, start_date)
+    # Inclusive calculation: includes the relieving date.
+    difference = relativedelta(end_date + relativedelta(days=1), start_date)
 
     doc.custom_service_years = difference.years
     doc.custom_service_month = difference.months
-    doc.custom_service_days = end_date.day
+    doc.custom_service_days = difference.days
+
     doc.custom_total_of_years = flt(
-        ((difference.years * 12) + difference.months + (end_date.day / 30)) / 12, 6
+        (
+            difference.years
+            + (difference.months / 12)
+            + (difference.days / 360)
+        ),
+        6,
     )
 
     log_trace(
@@ -2176,9 +2210,9 @@ def apply_service_period(doc):
             "years": doc.custom_service_years,
             "months": doc.custom_service_month,
             "days": doc.custom_service_days,
+            "total_years": doc.custom_total_of_years,
         },
     )
-
 
 def get_closed_workflow_states():
     return ["Cancel", "Signed"]
