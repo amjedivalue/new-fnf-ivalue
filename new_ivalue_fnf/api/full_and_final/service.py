@@ -965,37 +965,21 @@ def get_leave_taken_days(
 
     taken += flt(personal_leave_days_by_type.get(leave_type, 0))
     return flt(taken, 2)
-def get_leave_type_annual_allocation_from_policy(
-    employee: str,
-    leave_type: str,
-    as_of_date,
-) -> float:
-    assignment = frappe.get_all(
-        "Leave Policy Assignment",
-        filters={
-            "employee": employee,
-            "docstatus": 1,
-            "effective_from": ("<=", as_of_date),
-        },
-        fields=["leave_policy"],
-        order_by="effective_from desc, modified desc",
-        limit=1,
-    )
 
-    if not assignment:
+def get_fixed_annual_leave_days_by_company(company: str) -> float:
+    if not company:
         return 0
 
-    annual_allocation = frappe.db.get_value(
-        "Leave Policy Detail",
-        {
-            "parent": assignment[0].leave_policy,
-            "leave_type": leave_type,
-        },
-        "annual_allocation",
-    )
+    country = frappe.db.get_value("Company", company, "country")
+    country = str(country or "").strip()
 
-    return flt(annual_allocation)
+    if country in ["Saudi Arabia", "United Arab Emirates", "UAE"]:
+        return 21
 
+    if country == "Jordan":
+        return 14
+
+    return 0
 def build_leave_encashment_rows(doc):
     setting_row = get_component_setting_for_company(doc.company, "Leaves")
 
@@ -1016,7 +1000,15 @@ def build_leave_encashment_rows(doc):
 
         if not allocation:
             continue
-
+        if flt(allocation.total_leaves_allocated) <= 0:
+            log_trace(
+                "leave allocation skipped because total leaves allocated is zero",
+                {
+                    "leave_type": leave_type,
+                    "allocation": allocation.name,
+                },
+            )
+            continue
         earned = flt(allocation.total_leaves_allocated) + flt(allocation.extra_days)
         taken = get_leave_taken_days(
             doc.employee,
@@ -1039,11 +1031,7 @@ def build_leave_encashment_rows(doc):
 
         days_in_relieving_month = get_days_in_month(doc.relieving_date)
 
-        assigned_leave_days = get_leave_type_annual_allocation_from_policy(
-            employee=doc.employee,
-            leave_type=leave_type,
-            as_of_date=doc.relieving_date,
-        )
+        assigned_leave_days = get_fixed_annual_leave_days_by_company(doc.company)
 
         if assigned_leave_days <= 0:
             assigned_leave_days = flt(allocation.total_leaves_allocated)
@@ -2734,11 +2722,10 @@ def explain_leave_amount(
     )
 
     days_in_relieving_month = get_days_in_month(doc.relieving_date)
-    assigned_leave_days = get_leave_type_annual_allocation_from_policy(
-        employee=doc.employee,
-        leave_type=allocation.leave_type,
-        as_of_date=doc.relieving_date,
-    )
+    assigned_leave_days = get_fixed_annual_leave_days_by_company(doc.company)
+
+    if assigned_leave_days <= 0:
+        assigned_leave_days = flt(allocation.total_leaves_allocated, 2)
 
     if assigned_leave_days <= 0:
         assigned_leave_days = flt(allocation.total_leaves_allocated, 2)
