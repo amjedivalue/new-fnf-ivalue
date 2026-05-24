@@ -1054,7 +1054,7 @@ def build_leave_encashment_rows(doc):
         )
 
         balance = flt(balance + additional_leave_balance, 2)
-#============================================new added
+#==================================================new added
 
 
 
