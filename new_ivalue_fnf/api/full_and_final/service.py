@@ -1023,7 +1023,7 @@ def build_leave_encashment_rows(doc):
 
 
 # ===========================================new added
-        today_date = doc.transaction_date or nowdate()
+        today_date =  nowdate()
 
         days_difference = max(
             date_diff(doc.relieving_date, today_date) ,
@@ -2720,8 +2720,7 @@ def explain_leave_amount(
 
     old_remaining_leaves = flt(earned_leaves - taken_leaves, 2)
 
-    today_date = doc.transaction_date or nowdate()
-
+    today_date = nowdate()
     days_difference = max(
         date_diff(doc.relieving_date, today_date) ,
         0,
