@@ -1009,6 +1009,7 @@ def build_leave_encashment_rows(doc):
                 },
             )
             continue
+        
         earned = flt(allocation.total_leaves_allocated) + flt(allocation.extra_days)
         taken = get_leave_taken_days(
             doc.employee,
@@ -1031,15 +1032,20 @@ def build_leave_encashment_rows(doc):
 
         days_in_relieving_month = get_days_in_month(doc.relieving_date)
 
-        assigned_leave_days = get_fixed_annual_leave_days_by_company(doc.company)
 
-        if assigned_leave_days <= 0:
-            assigned_leave_days = flt(allocation.total_leaves_allocated)
+       
 
-        additional_leave_balance = flt(
-            (assigned_leave_days / 12 / days_in_relieving_month) * days_difference,
-            2,
-        )
+        additional_leave_balance = 0
+        if "annual" in str(leave_type or "").lower():
+            assigned_leave_days = get_fixed_annual_leave_days_by_company(doc.company)
+
+            if assigned_leave_days <= 0:
+                assigned_leave_days = flt(allocation.total_leaves_allocated)
+
+            additional_leave_balance = flt(
+                (assigned_leave_days / 12 / days_in_relieving_month) * days_difference,
+                2,
+            )
 
         balance = flt(balance + additional_leave_balance, 2)
 #==================================================new added
@@ -2722,25 +2728,29 @@ def explain_leave_amount(
     )
 
     days_in_relieving_month = get_days_in_month(doc.relieving_date)
-    assigned_leave_days = get_fixed_annual_leave_days_by_company(doc.company)
 
-    if assigned_leave_days <= 0:
-        assigned_leave_days = flt(allocation.total_leaves_allocated, 2)
+    additional_leave_balance = 0
+    assigned_leave_days = 0
+    monthly_leave_accrual = 0
+    daily_leave_accrual = 0
 
-    if assigned_leave_days <= 0:
-        assigned_leave_days = flt(allocation.total_leaves_allocated, 2)
-    monthly_leave_accrual = flt(assigned_leave_days / 12, 4)
+    if "annual" in str(allocation.leave_type or "").lower():
+        assigned_leave_days = get_fixed_annual_leave_days_by_company(doc.company)
 
-    daily_leave_accrual = flt(
-        monthly_leave_accrual / days_in_relieving_month,
-        4,
-    )
+        if assigned_leave_days <= 0:
+            assigned_leave_days = flt(allocation.total_leaves_allocated, 2)
 
-    additional_leave_balance = flt(
-        daily_leave_accrual * days_difference,
-        2,
-    )
+        monthly_leave_accrual = flt(assigned_leave_days / 12, 4)
 
+        daily_leave_accrual = flt(
+            monthly_leave_accrual / days_in_relieving_month,
+            4,
+        )
+
+        additional_leave_balance = flt(
+            daily_leave_accrual * days_difference,
+            2,
+        )
     remaining_leaves = flt(old_remaining_leaves + additional_leave_balance, 2)
 
 
