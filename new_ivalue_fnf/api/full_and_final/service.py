@@ -1043,7 +1043,7 @@ def build_leave_encashment_rows(doc):
                 assigned_leave_days = flt(allocation.total_leaves_allocated)
 
             additional_leave_balance = flt(
-                (assigned_leave_days / 12 / days_in_relieving_month) * (days_difference+1),
+                (assigned_leave_days / 12 / days_in_relieving_month) * (days_difference),
                 2,
             )
 
@@ -2747,7 +2747,7 @@ def explain_leave_amount(
         )
 
         additional_leave_balance = flt(
-            daily_leave_accrual * (days_difference+1),
+            daily_leave_accrual * (days_difference),
             2,
         )
     remaining_leaves = flt(old_remaining_leaves + additional_leave_balance, 2)
@@ -2801,7 +2801,7 @@ def explain_leave_amount(
 {
     "label": "Proration Days Used",
     "value": "{0} days after {1} until {2}".format(
-        days_difference+1,
+        days_difference,
         today_date,
         doc.relieving_date,
     ),
@@ -2827,7 +2827,7 @@ def explain_leave_amount(
         "label": "Prorated Leave Added Formula",
         "value": "{0} x {1} days = {2}".format(
             daily_leave_accrual,
-            days_difference +1,
+            days_difference ,
             additional_leave_balance,
         ),
     },
