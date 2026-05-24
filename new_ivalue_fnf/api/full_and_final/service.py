@@ -965,7 +965,36 @@ def get_leave_taken_days(
 
     taken += flt(personal_leave_days_by_type.get(leave_type, 0))
     return flt(taken, 2)
+def get_leave_type_annual_allocation_from_policy(
+    employee: str,
+    leave_type: str,
+    as_of_date,
+) -> float:
+    assignment = frappe.get_all(
+        "Leave Policy Assignment",
+        filters={
+            "employee": employee,
+            "docstatus": 1,
+            "effective_from": ("<=", as_of_date),
+        },
+        fields=["leave_policy"],
+        order_by="effective_from desc, modified desc",
+        limit=1,
+    )
 
+    if not assignment:
+        return 0
+
+    annual_allocation = frappe.db.get_value(
+        "Leave Policy Detail",
+        {
+            "parent": assignment[0].leave_policy,
+            "leave_type": leave_type,
+        },
+        "annual_allocation",
+    )
+
+    return flt(annual_allocation)
 
 def build_leave_encashment_rows(doc):
     setting_row = get_component_setting_for_company(doc.company, "Leaves")
@@ -1010,7 +1039,14 @@ def build_leave_encashment_rows(doc):
 
         days_in_relieving_month = get_days_in_month(doc.relieving_date)
 
-        assigned_leave_days = flt(allocation.total_leaves_allocated)
+        assigned_leave_days = get_leave_type_annual_allocation_from_policy(
+            employee=doc.employee,
+            leave_type=leave_type,
+            as_of_date=doc.relieving_date,
+        )
+
+        if assigned_leave_days <= 0:
+            assigned_leave_days = flt(allocation.total_leaves_allocated)
 
         additional_leave_balance = flt(
             (assigned_leave_days / 12 / days_in_relieving_month) * days_difference,
@@ -1018,7 +1054,6 @@ def build_leave_encashment_rows(doc):
         )
 
         balance = flt(balance + additional_leave_balance, 2)
-
 #============================================new added
 
 
@@ -1316,7 +1351,12 @@ def build_gratuity_payable(doc):
         service_years=total_years_for_rule,
         reason_of_leaving=reason_of_leaving,
     )
+    component_name = gratuity_setting.display_name or "Gratuity"
 
+    if normalize_text(reason_of_leaving) == "Termination under Article 77":
+        article_77_compensation = flt(monthly_salary * 2, 2)
+        final_amount = flt(final_amount + article_77_compensation, 2)
+        component_name = "Gratuity+Compensation"
     if flt(final_amount) <= 0:
         log_trace("gratuity amount is zero", {
             "service_years": service_years,
@@ -1330,14 +1370,12 @@ def build_gratuity_payable(doc):
     append_row(
         doc=doc,
         table_field="payables",
-        component=gratuity_setting.display_name or "Gratuity",
+        component=component_name,
         amount=final_amount,
         account=gratuity_setting.account,
         reference_document_type="Employee",
         reference_document=doc.employee,
-        custom_number_of_days=flt(total_months * 30, 2),  # ← السطر الجديد
-
-        
+        custom_number_of_days=flt(total_months * 30, 2),
     )
 
     log_trace("gratuity row added", {
@@ -2343,6 +2381,7 @@ def populate_full_and_final_doc(doc, method=None):
 
     build_salary_days_payable(doc)
     build_gratuity_payable(doc)
+
     build_monthly_additional_salary_rows(doc)
     build_employee_advance_rows(doc)
     build_unpaid_leave_receivable(doc)
@@ -2661,8 +2700,14 @@ def explain_leave_amount(
     )
 
     days_in_relieving_month = get_days_in_month(doc.relieving_date)
-    assigned_leave_days = flt(allocation.total_leaves_allocated, 2)
+    assigned_leave_days = get_leave_type_annual_allocation_from_policy(
+        employee=doc.employee,
+        leave_type=allocation.leave_type,
+        as_of_date=doc.relieving_date,
+    )
 
+    if assigned_leave_days <= 0:
+        assigned_leave_days = flt(allocation.total_leaves_allocated, 2)
     monthly_leave_accrual = flt(assigned_leave_days / 12, 4)
 
     daily_leave_accrual = flt(
@@ -2732,10 +2777,6 @@ def explain_leave_amount(
     ),
 },
 
-{
-    "label": "Proration Days Used",
-    "value": "{0} days".format(days_difference),
-},
 
     {
         "label": "Monthly Leave Accrual Formula",
@@ -3234,6 +3275,13 @@ def explain_gratuity_amount(doc, component: str, amount: float):
         reason_of_leaving=reason_of_leaving,
     )
 
+
+    article_77_compensation = 0
+
+    if normalize_text(reason_of_leaving) == "Termination under Article 77":
+        article_77_compensation = flt(monthly_salary * 2, 2)
+        final_amount = flt(final_amount + article_77_compensation, 2)
+    
     return {
         "title": component or "Gratuity",
         "summary": "This amount is calculated based on Saudi gratuity rules using service years, monthly gross salary, and reason of leaving.",
@@ -3291,17 +3339,7 @@ def explain_gratuity_amount(doc, component: str, amount: float):
     ),
 },
 
-            {
-    "label": "After 5 Years Days",
-    "value": "{0} days".format(after_five_years_days),
-},
-{
-    "label": "After 5 Years Daily Rate",
-    "value": "{0} / 360 = {1}".format(
-        monthly_salary,
-        after_five_years_daily_rate,
-    ),
-},
+  
 {
     "label": "After 5 Years Days",
     "value": "{0} days".format(after_five_years_days),
@@ -3335,21 +3373,38 @@ def explain_gratuity_amount(doc, component: str, amount: float):
                     base_amount,
                 ),
             },
-            {
-                "label": "Resignation Rule",
-                "value": get_resignation_rule_text(
-                    service_years=service_years,
-                    reason_of_leaving=reason_of_leaving,
-                ),
-            },
-            {
-                "label": "Final Formula",
-                "value": "{0} × {1} = {2}".format(
-                    base_amount,
-                    resignation_multiplier,
-                    final_amount,
-                ),
-            },
+           {
+    "label": "Resignation Rule",
+    "value": get_resignation_rule_text(
+        service_years=service_years,
+        reason_of_leaving=reason_of_leaving,
+    ),
+},
+{
+    "label": "Article 77 Compensation",
+    "value": (
+        "{0} x 2 = {1}".format(monthly_salary, article_77_compensation)
+        if article_77_compensation > 0
+        else "Not applicable"
+    ),
+},
+{
+    "label": "Final Formula",
+    "value": (
+        "{0} x {1} + {2} = {3}".format(
+            base_amount,
+            resignation_multiplier,
+            article_77_compensation,
+            final_amount,
+        )
+        if article_77_compensation > 0
+        else "{0} x {1} = {2}".format(
+            base_amount,
+            resignation_multiplier,
+            final_amount,
+        )
+    ),
+},
             {
                 "label": "Final Amount",
                 "value": final_amount or amount,
