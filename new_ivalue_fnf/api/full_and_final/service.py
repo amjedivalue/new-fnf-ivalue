@@ -375,7 +375,7 @@ def get_employee_basic_data(employee: str) -> dict:
                 "date_of_joining",
                 "relieving_date",
                 "employment_type",
-                "user_id",
+                "personal_email",
                 "custom_reason_of_leaving",
             ],
             as_dict=True,
@@ -677,7 +677,7 @@ def apply_document_header(doc, employee_data: dict):
     doc.department = employee_data.get("department")
     doc.designation = employee_data.get("designation")
     if hasattr(doc, "custom_user_id"):
-        doc.custom_user_id = employee_data.get("user_id")
+        doc.custom_user_id = employee_data.get("personal_email")
 
     if not doc.date_of_joining:
         doc.date_of_joining = employee_data.get("date_of_joining")
@@ -2123,7 +2123,7 @@ def validate_required_values(doc):
         "Employee",
         doc.employee,
         [
-            "user_id",
+            "personal_email",
         ],
         as_dict=True,
     )
