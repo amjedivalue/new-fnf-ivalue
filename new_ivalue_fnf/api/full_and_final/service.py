@@ -1022,16 +1022,21 @@ def build_leave_encashment_rows(doc):
 
 
 
-# ===========================================new added
-        today_date =  nowdate()
+        # Calculate additional annual leave balance from Transaction Date
+        # until Relieving Date.
+        #keeps leave balance stable after the first save.
+        if not doc.transaction_date:
+            frappe.throw(
+                _("Transaction Date is required before calculating leave balance.")
+            )
+        transaction_date = doc.transaction_date 
 
         days_difference = max(
-            date_diff(doc.relieving_date, today_date) ,
+            date_diff(doc.relieving_date, transaction_date),
             0,
         )
 
         days_in_relieving_month = get_days_in_month(doc.relieving_date)
-
 
        
 
@@ -2380,6 +2385,65 @@ def validate_accounts_before_finance_approval(doc):
                 "Please fill Account for the following rows before Finance Approval:<br><br>{0}"
             ).format("<br>".join(missing_accounts))
         )
+
+
+
+# ============================================================
+# Auto Pull Rebuild Control
+# Return True if the row was generated automatically from a source document.
+
+#     Auto rows have:
+#     - reference_document_type
+#     - reference_document
+#     - custom_is_manual_row = 0
+
+#     Manual rows must not be treated as auto rows.
+# ============================================================
+def is_auto_pull_row(row) -> bool:
+    
+    if cint(getattr(row, "custom_is_manual_row", 0)):
+        return False
+
+    reference_document_type = str(
+        getattr(row, "reference_document_type", "") or ""
+    ).strip()
+
+    reference_document = str(
+        getattr(row, "reference_document", "") or ""
+    ).strip()
+
+    return bool(reference_document_type and reference_document)
+
+
+def has_auto_pull_rows(doc) -> bool:
+    """
+    Check if the document currently has any auto pulled rows.
+    """
+    for table_field in ["payables", "receivables"]:
+        for row in getattr(doc, table_field, []) or []:
+            if is_auto_pull_row(row):
+                return True
+
+    return False
+
+
+def should_fetch_auto_pull_rows(doc) -> bool:
+    """
+    Fetch auto rows only:
+    1. On first save for a new document.
+    2. When all existing auto pulled rows were deleted.
+    """
+    if doc.is_new():
+        return True
+
+    return not has_auto_pull_rows(doc)
+
+
+
+
+
+
+
 def populate_full_and_final_doc(doc, method=None):
     log_trace("populate started", {"doc": doc.name, "employee": doc.employee})
 
@@ -2403,22 +2467,45 @@ def populate_full_and_final_doc(doc, method=None):
                 cint(getattr(row, "paid_via_salary_slip", 0))
             )
 
-    doc._paid_via_salary_slip_map = paid_via_salary_slip_map
-    doc._fnf_existing_auto_row_account_map = build_existing_auto_row_account_map(doc)
-    clear_auto_tables(doc)
+    # Build auto pulled rows only when needed.
+    # This prevents leave balance, accounts, and settlement rows
+    # from being recalculated on every save.
+    should_fetch_auto_rows = should_fetch_auto_pull_rows(doc)
 
-    build_salary_days_payable(doc)
-    build_gratuity_payable(doc)
+    if should_fetch_auto_rows:
+        doc._paid_via_salary_slip_map = paid_via_salary_slip_map
+        doc._fnf_existing_auto_row_account_map = build_existing_auto_row_account_map(doc)
 
-    build_monthly_additional_salary_rows(doc)
-    build_employee_advance_rows(doc)
-    build_unpaid_leave_receivable(doc)
+        clear_auto_tables(doc)
 
-    build_leave_encashment_rows(doc)
+        build_salary_days_payable(doc)
+        build_gratuity_payable(doc)
+
+        build_monthly_additional_salary_rows(doc)
+        build_employee_advance_rows(doc)
+        build_unpaid_leave_receivable(doc)
+
+        build_leave_encashment_rows(doc)
+
+        log_trace(
+            "auto pull rows fetched",
+            {
+                "doc": doc.name,
+                "is_new": doc.is_new(),
+            },
+        )
+    else:
+        log_trace(
+            "auto pull rows skipped because document already has auto rows",
+            {
+                "doc": doc.name,
+            },
+        )
 
     sync_manual_rows_to_additional_salary(doc)
 
     apply_totals(doc)
+
 
     log_trace(
         "populate finished",
@@ -2720,9 +2807,15 @@ def explain_leave_amount(
 
     old_remaining_leaves = flt(earned_leaves - taken_leaves, 2)
 
-    today_date = nowdate()
+    if not doc.transaction_date:
+        frappe.throw(
+        _("Transaction Date is required before explaining leave balance.")
+    )
+
+    transaction_date = doc.transaction_date
+
     days_difference = max(
-        date_diff(doc.relieving_date, today_date) ,
+        date_diff(doc.relieving_date, transaction_date),
         0,
     )
 
@@ -2755,8 +2848,8 @@ def explain_leave_amount(
 
     return {
         "title": component or "Leave Encashment",
-"summary": "Leave encashment equals the existing leave balance plus prorated leave earned after the current date used on this statement until the relieving date.",
-       "lines": [
+"summary": "Leave encashment equals the existing leave balance plus prorated leave earned after the transaction date until the relieving date.",
+"lines": [
     {
         "label": "Leave Allocation",
         "value": reference_document,
@@ -2786,23 +2879,23 @@ def explain_leave_amount(
             old_remaining_leaves,
         ),
     },
-    {
-        "label": "Current Date Used",
-        "value": today_date,
-    },
+   {
+    "label": "Transaction Date Used",
+    "value": transaction_date,
+},
     {
         "label": "Relieving Date",
         "value": doc.relieving_date,
     },
 {
     "label": "Proration Basis",
-    "value": "Current Date is already included in system leave balance",
+    "value": "Transaction Date is used as the cutoff date for leave proration",
 },
 {
     "label": "Proration Days Used",
     "value": "{0} days after {1} until {2}".format(
         days_difference,
-        today_date,
+        transaction_date,
         doc.relieving_date,
     ),
 },
