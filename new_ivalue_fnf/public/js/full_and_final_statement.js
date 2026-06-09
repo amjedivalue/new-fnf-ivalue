@@ -34,7 +34,7 @@ frappe.ui.form.on("Full and Final Statement", {
 
         clear_placeholder_rows(frm);
         lock_employee_field_when_manual_rows_exist(frm);
-    lock_employee_field_after_save(frm);
+        lock_employee_field_after_save(frm);
 
         // add_full_and_final_settings_button(frm);
         // add_review_settlement_button(frm);
@@ -135,50 +135,50 @@ frappe.ui.form.on("Full and Final Statement", {
 
 
 
-       // New document flow.
-// User may change employee before saving, so clear old employee data first.
-// New document flow.
-// User may change employee before saving, so clear old employee data first.
-frappe.dom.freeze(__("Loading employee settlement data..."));
+        // New document flow.
+        // User may change employee before saving, so clear old employee data first.
+        // New document flow.
+        // User may change employee before saving, so clear old employee data first.
+        frappe.dom.freeze(__("Loading employee settlement data..."));
 
-try {
-    await clear_employee_related_data_keep_employee(frm);
+        try {
+            await clear_employee_related_data_keep_employee(frm);
 
-    let existing_doc = await check_existing_full_and_final(frm);
+            let existing_doc = await check_existing_full_and_final(frm);
 
-    if (existing_doc) {
-        show_existing_full_and_final_dialog(frm, existing_doc);
-        return;
-    }
+            if (existing_doc) {
+                show_existing_full_and_final_dialog(frm, existing_doc);
+                return;
+            }
 
-    // Always load employee data from Employee profile first.
-    await load_employee_basic_data(frm);
+            // Always load employee data from Employee profile first.
+            await load_employee_basic_data(frm);
 
-    // Always force Relieving Date from Employee profile.
-    // let has_relieving_date = await ensure_employee_relieving_date(frm);
+            // Always force Relieving Date from Employee profile.
+            // let has_relieving_date = await ensure_employee_relieving_date(frm);
 
-    // if (!has_relieving_date) {
-    //     return;
-    // }
+            // if (!has_relieving_date) {
+            //     return;
+            // }
 
-    // After employee data is loaded, validate Employee Separation.
-    let employee_separation = await check_employee_separation(frm);
+            // After employee data is loaded, validate Employee Separation.
+            let employee_separation = await check_employee_separation(frm);
 
-    if (!employee_separation) {
-        await show_missing_employee_separation_message(frm);
-        return;
-    }
+            if (!employee_separation) {
+                await show_missing_employee_separation_message(frm);
+                return;
+            }
 
-    // await fetch_fnf_manual_rows_from_additional_salary(frm);
+            // await fetch_fnf_manual_rows_from_additional_salary(frm);
 
-    await frm.set_value("custom_employee_separation", employee_separation.name);
+            await frm.set_value("custom_employee_separation", employee_separation.name);
 
-    frm.refresh_field("custom_employee_separation");
-    frm.refresh_field("relieving_date");
-    frm.refresh_field("custom_user_id");
-} finally {
-    frappe.dom.unfreeze();
-}
+            frm.refresh_field("custom_employee_separation");
+            frm.refresh_field("relieving_date");
+            frm.refresh_field("custom_user_id");
+        } finally {
+            frappe.dom.unfreeze();
+        }
     },
     // Runs when the company is changed and resets child table filters.
     company: function (frm) {
@@ -192,59 +192,69 @@ try {
     },
 
     // Runs before saving the document and validates required employee data.
-validate: async function (frm) {
-    clear_placeholder_rows(frm);
+    validate: async function (frm) {
+        clear_placeholder_rows(frm);
 
-    if (!frm.doc.employee) {
-        return;
-    }
-
-    frappe.dom.freeze(__("Validating employee settlement data..."));
-
-    try {
-        // Always load employee data before any validation.
-        // This guarantees Relieving Date comes from Employee Profile before save.
-        await load_employee_basic_data(frm);
-
-        // let has_relieving_date = await ensure_employee_relieving_date(frm);
-
-        // if (!has_relieving_date) {
-        //     frappe.validated = false;
-        //     return;
-        // }
-
-        if (!frm.doc.custom_user_id) {
-            frappe.msgprint({
-                title: __("Missing User ID"),
-                message: __("This employee is not linked to a User. Please set the User ID on the Employee record, then reselect the employee."),
-                indicator: "orange"
-            });
-
-            frappe.validated = false;
+        if (!frm.doc.employee) {
             return;
         }
 
-        // Check Employee Separation after employee data is loaded.
-        let employee_separation = await check_employee_separation(frm);
+        frappe.dom.freeze(__("Validating employee settlement data..."));
 
-        if (!employee_separation) {
-            frappe.msgprint({
-                title: __("Employee Separation Required"),
-                message: __(
-                    "Please create Employee Separation before saving this Full and Final Statement."
-                ),
-                indicator: "orange"
-            });
+        try {
+            // Always load employee data before any validation.
+            // This guarantees Relieving Date comes from Employee Profile before save.
+            // Load employee data only when needed.
+            // For saved documents, do not reload employee details on every save.
+            // This allows row-only changes, like deleting all auto rows,
+            // to reach the Python auto-pull rebuild logic.
+            if (
+                frm.is_new() ||
+                !frm.doc.employee_name ||
+                !frm.doc.company ||
+                !frm.doc.relieving_date
+            ) {
+                await load_employee_basic_data(frm);
+            }
+            // let has_relieving_date = await ensure_employee_relieving_date(frm);
 
-            frappe.validated = false;
-            return;
+            // if (!has_relieving_date) {
+            //     frappe.validated = false;
+            //     return;
+            // }
+
+            if (!frm.doc.custom_user_id) {
+                frappe.msgprint({
+                    title: __("Missing User ID"),
+                    message: __("This employee is not linked to a User. Please set the User ID on the Employee record, then reselect the employee."),
+                    indicator: "orange"
+                });
+
+                frappe.validated = false;
+                return;
+            }
+
+            // Check Employee Separation after employee data is loaded.
+            let employee_separation = await check_employee_separation(frm);
+
+            if (!employee_separation) {
+                frappe.msgprint({
+                    title: __("Employee Separation Required"),
+                    message: __(
+                        "Please create Employee Separation before saving this Full and Final Statement."
+                    ),
+                    indicator: "orange"
+                });
+
+                frappe.validated = false;
+                return;
+            }
+
+            await frm.set_value("custom_employee_separation", employee_separation.name);
+        } finally {
+            frappe.dom.unfreeze();
         }
-
-        await frm.set_value("custom_employee_separation", employee_separation.name);
-    } finally {
-        frappe.dom.unfreeze();
-    }
-},
+    },
     before_workflow_action: async function (frm) {
         if (
             frm.doc.workflow_state === "Pending Finance Director" &&
@@ -797,7 +807,7 @@ async function load_employee_basic_data(frm) {
             message: __("Could not load employee details. Please try again."),
             indicator: "red"
         });
-    } 
+    }
 }
 
 async function fetch_fnf_manual_rows_from_additional_salary(frm) {
