@@ -65,17 +65,17 @@ fixtures = [
         ],
     },
     {
-        # "dt": "Print Format",
-        # "filters": [
-        #     [
-        #         "name",
-        #         "in",
-        #         [
-        #             "Custom Full and Final Statement",
-        #             "fnf_clearance_ar",
-        #         ],
-        #     ]
-        # ],
+        "dt": "Print Format",
+        "filters": [
+            [
+                "name",
+                "in",
+                [
+                    "Custom Full and Final Statement",
+                    "fnf_clearance_ar",
+                ],
+            ]
+        ],
     },
     {
         "dt": "Workflow",
