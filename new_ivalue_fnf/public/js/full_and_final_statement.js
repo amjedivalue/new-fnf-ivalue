@@ -225,8 +225,8 @@ frappe.ui.form.on("Full and Final Statement", {
 
             if (!frm.doc.custom_user_id) {
                 frappe.msgprint({
-                    title: __("Missing User ID"),
-                    message: __("This employee is not linked to a User. Please set the User ID on the Employee record, then reselect the employee."),
+                   title: __("Missing Personal Email"),
+message: __("This employee does not have a Personal Email. Please set the Personal Email on the Employee record, then reselect the employee."),
                     indicator: "orange"
                 });
 
@@ -772,7 +772,7 @@ async function load_employee_basic_data(frm) {
                 "designation",
                 "date_of_joining",
                 "relieving_date",
-                "user_id",
+                "personal_email",
                 "employment_type"
             ]
         );
@@ -795,7 +795,7 @@ async function load_employee_basic_data(frm) {
         await frm.set_value("designation", employee.designation || "");
         await frm.set_value("date_of_joining", employee.date_of_joining || "");
         await frm.set_value("relieving_date", employee.relieving_date || "");
-        await frm.set_value("custom_user_id", employee.user_id || "");
+await frm.set_value("custom_user_id", employee.personal_email || "");
         await frm.set_value("custom_employment_type", employee.employment_type || "");
 
         clear_placeholder_rows(frm);
