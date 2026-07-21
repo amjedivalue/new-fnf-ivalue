@@ -16,7 +16,7 @@ def log_trace(message: str, data=None):
 # ============================================================
 # SECTION 2: Date Helpers
 # ============================================================
-
+ 
 
 def get_inclusive_days(start_date, end_date) -> int:
     if not start_date or not end_date:
@@ -988,18 +988,23 @@ def build_leave_encashment_rows(doc):
         return
 
     personal_leave_days_by_type = get_personal_leave_days_by_type(
-        doc.employee, doc.relieving_date
+        doc.employee,
+        doc.relieving_date,
     )
+
     carry_forward_leave_types = get_carry_forward_leave_types()
     daily_rate = flt(flt(doc.custom_monthly_gross_salary) / 30, 2)
 
     for leave_type in carry_forward_leave_types:
         allocation = get_latest_leave_allocation(
-            doc.employee, leave_type, doc.relieving_date
+            doc.employee,
+            leave_type,
+            doc.relieving_date,
         )
 
         if not allocation:
             continue
+
         if flt(allocation.total_leaves_allocated) <= 0:
             log_trace(
                 "leave allocation skipped because total leaves allocated is zero",
@@ -1009,8 +1014,9 @@ def build_leave_encashment_rows(doc):
                 },
             )
             continue
-        
+
         earned = flt(allocation.total_leaves_allocated) + flt(allocation.extra_days)
+
         taken = get_leave_taken_days(
             doc.employee,
             leave_type,
@@ -1018,18 +1024,17 @@ def build_leave_encashment_rows(doc):
             doc.relieving_date,
             personal_leave_days_by_type,
         )
+
         balance = flt(earned - taken, 2)
 
-
-
-        # Calculate additional annual leave balance from Transaction Date
-        # until Relieving Date.
-        #keeps leave balance stable after the first save.
+        # Add prorated leave earned between the Full and Final transaction date
+        # and the employee relieving date.
         if not doc.transaction_date:
             frappe.throw(
                 _("Transaction Date is required before calculating leave balance.")
             )
-        transaction_date = doc.transaction_date 
+
+        transaction_date = doc.transaction_date
 
         days_difference = max(
             date_diff(doc.relieving_date, transaction_date),
@@ -1038,9 +1043,8 @@ def build_leave_encashment_rows(doc):
 
         days_in_relieving_month = get_days_in_month(doc.relieving_date)
 
-       
-
         additional_leave_balance = 0
+
         if "annual" in str(leave_type or "").lower():
             assigned_leave_days = get_fixed_annual_leave_days_by_company(doc.company)
 
@@ -1048,20 +1052,18 @@ def build_leave_encashment_rows(doc):
                 assigned_leave_days = flt(allocation.total_leaves_allocated)
 
             additional_leave_balance = flt(
-                (assigned_leave_days / 12 / days_in_relieving_month) * (days_difference),
+                (assigned_leave_days / 12 / days_in_relieving_month)
+                * days_difference,
                 2,
             )
 
         balance = flt(balance + additional_leave_balance, 2)
-#==================================================new added
-
-
-
 
         if balance <= 0:
             continue
 
         amount = flt(balance * daily_rate, 2)
+
         component_label = setting_row.display_name or "Leaves"
         leave_format = get_settings_field_value(doc.company, "leave_format", "New Name")
 
@@ -1094,6 +1096,8 @@ def build_leave_encashment_rows(doc):
                 "leave_type": leave_type,
                 "balance": balance,
                 "amount": amount,
+                "additional_leave_balance": additional_leave_balance,
+                "days_difference": days_difference,
             },
         )
 
@@ -2100,17 +2104,6 @@ def set_transaction_date(doc, method=None):
     log_trace("transaction date set", doc.transaction_date)
 
 
-# def validate_required_values(doc):
-#     if not doc.employee:
-#         log_trace("skip build because employee is empty")
-#         return False
-
-#     if not doc.relieving_date:
-#         log_trace("skip build because relieving_date is empty")
-#         return False
-
-#     return True
-
 def validate_required_values(doc):
     if not doc.employee:
         log_trace("skip build because employee is empty")
@@ -2142,42 +2135,55 @@ def validate_required_values(doc):
         doc.custom_user_id = employee_data.user_id
 
     return True
-# def apply_service_period(doc):
-#     if not doc.date_of_joining or not doc.relieving_date:
-#         return
 
-#     start_date = getdate(doc.date_of_joining)
-#     end_date = getdate(doc.relieving_date)
+def validate_no_open_leave_applications_in_clearance_period(doc):
+    if not doc.employee or not doc.relieving_date:
+        return
 
-#     if end_date < start_date:
-#         frappe.throw("Relieving Date cannot be before Date of Joining.")
+    clearance_start = get_month_first_day(doc.relieving_date)
+    clearance_end = doc.relieving_date
 
-#     # difference = relativedelta(end_date + relativedelta(days=1), start_date)
-#     # total_days = (end_date - start_date).days + 1
+    open_leaves = frappe.get_all(
+        "Leave Application",
+        filters=[
+            ["Leave Application", "employee", "=", doc.employee],
+            ["Leave Application", "workflow_state", "in", ["Pending", "Accepted"]],
+            ["Leave Application", "from_date", "<=", clearance_end],
+            ["Leave Application", "to_date", ">=", clearance_start],
+        ],
+        fields=[
+            "name",
+            "leave_type",
+            "from_date",
+            "to_date",
+            "status",
+            "workflow_state",
+        ],
+        order_by="from_date asc",
+    )
 
-#     # doc.custom_service_years = difference.years
-#     # doc.custom_service_month = difference.months
-#     # doc.custom_service_days = difference.days
-#     # doc.custom_total_of_years = flt(total_days / 365, 6)
-#     # وحطّ هاد بدله
-#     difference = relativedelta(end_date, start_date)
+    if not open_leaves:
+        return
 
-#     doc.custom_service_years = difference.years
-#     doc.custom_service_month = difference.months
-#     doc.custom_service_days = end_date.day
-#     doc.custom_total_of_years = flt(
-#         ((difference.years * 12) + difference.months + (end_date.day / 30)) / 12, 6
-#     )
+    leave_list = ", ".join(
+        [
+            "{0} ({1} to {2}, workflow: {3})".format(
+                leave.name,
+                leave.from_date,
+                leave.to_date,
+                leave.workflow_state,
+            )
+            for leave in open_leaves
+        ]
+    )
 
-#     log_trace(
-#         "service period applied",
-#         {
-#             "years": doc.custom_service_years,
-#             "months": doc.custom_service_month,
-#             "days": doc.custom_service_days,
-#         },
-#     )
+    frappe.throw(
+        _(
+            "Cannot create Full and Final Statement. The employee has pending leave application(s) during the clearance month ({0} to {1}): {2}. Please approve, reject, or cancel them first."
+        ).format(clearance_start, clearance_end, leave_list)
+    )
 def apply_service_period(doc):
+    
     if not doc.date_of_joining or not doc.relieving_date:
         return
 
@@ -2454,6 +2460,17 @@ def populate_full_and_final_doc(doc, method=None):
     validate_no_other_full_and_final_exists(doc)
     validate_if_have_sepration(doc)
     load_base_document_data(doc)
+
+    should_check_open_leaves = doc.is_new()
+
+    if not should_check_open_leaves:
+        should_check_open_leaves = (
+            doc.has_value_changed("employee")
+            or doc.has_value_changed("relieving_date")
+        )
+
+    if should_check_open_leaves:
+        validate_no_open_leave_applications_in_clearance_period(doc)
     paid_via_salary_slip_map = {}
 
     for row in (doc.payables or []) + (doc.receivables or []):
