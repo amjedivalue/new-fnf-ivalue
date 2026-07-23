@@ -162,18 +162,18 @@ frappe.ui.form.on("Full and Final Statement", {
             // }
 
             // After employee data is loaded, validate Employee Separation.
-            let employee_separation = await check_employee_separation(frm);
+            // let employee_separation = await check_employee_separation(frm);
 
-            if (!employee_separation) {
-                await show_missing_employee_separation_message(frm);
-                return;
-            }
+            // if (!employee_separation) {
+            //     await show_missing_employee_separation_message(frm);
+            //     return;
+            // }
 
-            // await fetch_fnf_manual_rows_from_additional_salary(frm);
+            // // await fetch_fnf_manual_rows_from_additional_salary(frm);
 
-            await frm.set_value("custom_employee_separation", employee_separation.name);
+            // await frm.set_value("custom_employee_separation", employee_separation.name);
 
-            frm.refresh_field("custom_employee_separation");
+            // frm.refresh_field("custom_employee_separation");
             frm.refresh_field("relieving_date");
             frm.refresh_field("custom_user_id");
         } finally {
@@ -208,14 +208,14 @@ frappe.ui.form.on("Full and Final Statement", {
             // For saved documents, do not reload employee details on every save.
             // This allows row-only changes, like deleting all auto rows,
             // to reach the Python auto-pull rebuild logic.
-            if (
-                frm.is_new() ||
-                !frm.doc.employee_name ||
-                !frm.doc.company ||
-                !frm.doc.relieving_date
-            ) {
-                await load_employee_basic_data(frm);
-            }
+            // if (
+            //     frm.is_new() ||
+            //     !frm.doc.employee_name ||
+            //     !frm.doc.company ||
+            //     !frm.doc.relieving_date
+            // ) {
+            //     await load_employee_basic_data(frm);
+            // }
             // let has_relieving_date = await ensure_employee_relieving_date(frm);
 
             // if (!has_relieving_date) {
@@ -223,51 +223,51 @@ frappe.ui.form.on("Full and Final Statement", {
             //     return;
             // }
 
-            if (!frm.doc.custom_user_id) {
-                frappe.msgprint({
-                   title: __("Missing Personal Email"),
-message: __("This employee does not have a Personal Email. Please set the Personal Email on the Employee record, then reselect the employee."),
-                    indicator: "orange"
-                });
+//             if (!frm.doc.custom_user_id) {
+//                 frappe.msgprint({
+//                    title: __("Missing Personal Email"),
+// message: __("This employee does not have a Personal Email. Please set the Personal Email on the Employee record, then reselect the employee."),
+//                     indicator: "orange"
+//                 });
 
-                frappe.validated = false;
-                return;
-            }
+            //     frappe.validated = false;
+            //     return;
+            // }
 
             // Check Employee Separation after employee data is loaded.
-            let employee_separation = await check_employee_separation(frm);
+            // let employee_separation = await check_employee_separation(frm);
 
-            if (!employee_separation) {
-                frappe.msgprint({
-                    title: __("Employee Separation Required"),
-                    message: __(
-                        "Please create Employee Separation before saving this Full and Final Statement."
-                    ),
-                    indicator: "orange"
-                });
+            // if (!employee_separation) {
+            //     frappe.msgprint({
+            //         title: __("Employee Separation Required"),
+            //         message: __(
+            //             "Please create Employee Separation before saving this Full and Final Statement."
+            //         ),
+            //         indicator: "orange"
+            //     });
 
-                frappe.validated = false;
-                return;
-            }
+            //     frappe.validated = false;
+            //     return;
+            // }
 
-            await frm.set_value("custom_employee_separation", employee_separation.name);
+            // await frm.set_value("custom_employee_separation", employee_separation.name);
         } finally {
             frappe.dom.unfreeze();
         }
     },
-    before_workflow_action: async function (frm) {
-        if (
-            frm.doc.workflow_state === "Pending Finance Director" &&
-            frm.selected_workflow_action === "Approve"
-        ) {
-            validate_accounts_before_finance_approval(frm);
-        }
-        if (frm.doc.workflow_state === "Pending Supporting Services Director") {
-            if (frm.selected_workflow_action === "Approve") {
-                await check_if_separatoin_has_been_submited(frm)
-            }
-        }
-    },
+    // before_workflow_action: async function (frm) {
+    //     if (
+    //         frm.doc.workflow_state === "Pending Finance Director" &&
+    //         frm.selected_workflow_action === "Approve"
+    //     ) {
+    //         validate_accounts_before_finance_approval(frm);
+    //     }
+    //     if (frm.doc.workflow_state === "Pending Supporting Services Director") {
+    //         if (frm.selected_workflow_action === "Approve") {
+    //             await check_if_separatoin_has_been_submited(frm)
+    //         }
+    //     }
+    // },
 
     // Runs before cancelling the document and cancels the Zoho document.
     after_cancel: function (frm) {
@@ -380,42 +380,6 @@ function validate_accounts_before_finance_approval(frm) {
     }
 }
 
-// async function ensure_employee_relieving_date(frm) {
-//     if (!frm.doc.employee) {
-//         return false;
-//     }
-
-//     let employee_response = await frappe.db.get_value(
-//         "Employee",
-//         frm.doc.employee,
-//         "relieving_date"
-//     );
-
-//     if (
-//         employee_response &&
-//         employee_response.message &&
-//         employee_response.message.relieving_date
-//     ) {
-//         await frm.set_value(
-//             "relieving_date",
-//             employee_response.message.relieving_date
-//         );
-
-//         frm.refresh_field("relieving_date");
-//         return true;
-//     }
-
-//     await frm.set_value("relieving_date", "");
-//     frm.refresh_field("relieving_date");
-
-//     frappe.msgprint({
-//         title: __("Missing Relieving Date"),
-//         message: __("Please set Relieving Date on the Employee record first."),
-//         indicator: "orange"
-//     });
-
-//     return false;
-// }
 
 // ================================================================
 // SECTION 2: Full and Final Outstanding Statement Child Table Events

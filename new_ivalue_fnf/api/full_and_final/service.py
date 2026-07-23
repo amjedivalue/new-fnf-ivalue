@@ -2101,7 +2101,15 @@ def set_transaction_date(doc, method=None):
     if not doc.transaction_date:
         doc.transaction_date = nowdate()
 
-    log_trace("transaction date set", doc.transaction_date)
+    if doc.employee and not doc.relieving_date:
+        employee_relieving_date = frappe.db.get_value(
+            "Employee",
+            doc.employee,
+            "relieving_date",
+        )
+
+        if employee_relieving_date:
+            doc.relieving_date = employee_relieving_date
 
 
 def validate_required_values(doc):
@@ -2111,28 +2119,15 @@ def validate_required_values(doc):
 
     if not doc.relieving_date:
         frappe.throw(
+            _("Set Relieving Date for Employee: {0}").format(doc.employee)
+        )
+
+    if hasattr(doc, "custom_user_id") and not doc.custom_user_id:
+        frappe.throw(
             _(
-                "Relieving Date is required on the Full and Final Statement. "
-                "Please set the Relieving Date on this document, then save again."
+                "This employee does not have a Personal Email. Please set the Personal Email on the Employee record, then save the Full and Final Statement again."
             )
         )
-
-    employee_data = frappe.db.get_value(
-        "Employee",
-        doc.employee,
-        [
-            "personal_email",
-        ],
-        as_dict=True,
-    )
-
-    if not employee_data:
-        frappe.throw(
-            _("Employee data not found. Please select the employee again.")
-        )
-
-    if hasattr(doc, "custom_user_id") and employee_data.user_id:
-        doc.custom_user_id = employee_data.user_id
 
     return True
 
@@ -2346,10 +2341,66 @@ def get_employee_separation_for_full_and_final(employee: str):
         "docstatus": separation.docstatus,
     }
 def validate_if_have_sepration(doc):
-    sepration=get_employee_separation_for_full_and_final(doc.employee)
-    if not sepration :
-        frappe.throw("Employee Separation is required before creating the Full and Final Statement. "
-                "Please create Employee Separation first, then come back and continue.")
+    separation = get_employee_separation_for_full_and_final(doc.employee)
+
+    if not separation:
+        frappe.throw(
+            _(
+                "Employee Separation is required before creating the Full and Final Statement. "
+                "Please create Employee Separation first, then come back and continue."
+            )
+        )
+
+    if hasattr(doc, "custom_employee_separation"):
+        doc.custom_employee_separation = separation.get("name")
+def validate_employee_separation_submitted_before_supporting_services_approval(doc):
+    previous_doc = doc.get_doc_before_save()
+
+    if not previous_doc:
+        return
+
+    previous_state = getattr(previous_doc, "workflow_state", None)
+    current_state = getattr(doc, "workflow_state", None)
+
+    if previous_state != "Pending Supporting Services Director":
+        return
+
+    if current_state == previous_state:
+        return
+
+    if not getattr(doc, "custom_employee_separation", None):
+        frappe.throw(
+            _(
+                "Employee Separation is required before approving this Full and Final Statement."
+            )
+        )
+
+    separation_docstatus = frappe.db.get_value(
+        "Employee Separation",
+        doc.custom_employee_separation,
+        "docstatus",
+    )
+
+    if separation_docstatus is None:
+        frappe.throw(
+            _(
+                "Employee Separation {0} was not found. Please link a valid Employee Separation first."
+            ).format(doc.custom_employee_separation)
+        )
+
+    if cint(separation_docstatus) == 2:
+        frappe.throw(
+            _(
+                "Employee Separation {0} is cancelled. Please create and submit a new Employee Separation first."
+            ).format(doc.custom_employee_separation)
+        )
+
+    if cint(separation_docstatus) != 1:
+        frappe.throw(
+            _(
+                "Employee Separation {0} must be submitted before approving this Full and Final Statement."
+            ).format(doc.custom_employee_separation)
+        )
 def validate_accounts_before_finance_approval(doc):
     previous_doc = doc.get_doc_before_save()
 
@@ -2365,35 +2416,64 @@ def validate_accounts_before_finance_approval(doc):
     if current_state == previous_state:
         return
 
-    missing_accounts = []
+    account_issues = []
 
-    for row in doc.payables or []:
-        if flt(getattr(row, "amount", 0)) > 0 and not getattr(row, "account", None):
-            missing_accounts.append(
-                "Payables row #{0} - {1}".format(
-                    row.idx,
-                    row.component or "-",
-                )
+    for table_field, label in [
+        ("payables", "Payables"),
+        ("receivables", "Receivables"),
+    ]:
+        for row in getattr(doc, table_field, []) or []:
+            if flt(getattr(row, "amount", 0)) <= 0:
+                continue
+
+            row_label = "{0} row #{1} - {2}".format(
+                label,
+                row.idx,
+                row.component or "-",
             )
 
-    for row in doc.receivables or []:
-        if flt(getattr(row, "amount", 0)) > 0 and not getattr(row, "account", None):
-            missing_accounts.append(
-                "Receivables row #{0} - {1}".format(
-                    row.idx,
-                    row.component or "-",
-                )
+            account = getattr(row, "account", None)
+
+            if not account:
+                account_issues.append("{0}: Account is required".format(row_label))
+                continue
+
+            account_data = frappe.db.get_value(
+                "Account",
+                account,
+                ["company", "is_group"],
+                as_dict=True,
             )
 
-    if missing_accounts:
+            if not account_data:
+                account_issues.append(
+                    "{0}: Account {1} does not exist".format(row_label, account)
+                )
+                continue
+
+            if account_data.company != doc.company:
+                account_issues.append(
+                    "{0}: Account {1} does not belong to company {2}".format(
+                        row_label,
+                        account,
+                        doc.company,
+                    )
+                )
+
+            if cint(account_data.is_group):
+                account_issues.append(
+                    "{0}: Account {1} is a Group account".format(
+                        row_label,
+                        account,
+                    )
+                )
+
+    if account_issues:
         frappe.throw(
             _(
-                "Please fill Account for the following rows before Finance Approval:<br><br>{0}"
-            ).format("<br>".join(missing_accounts))
+                "Please fix the following account issue(s) before Finance Approval:<br><br>{0}"
+            ).format("<br>".join(account_issues))
         )
-
-
-
 # ============================================================
 # Auto Pull Rebuild Control
 # Return True if the row was generated automatically from a source document.
@@ -2446,20 +2526,63 @@ def should_fetch_auto_pull_rows(doc) -> bool:
 
 
 
+def normalize_paid_via_salary_slip_usage(doc):
+    for row in doc.receivables or []:
+        if hasattr(row, "paid_via_salary_slip"):
+            row.paid_via_salary_slip = 0
+def normalize_manual_settlement_rows(doc):
+    for table_field in ["payables", "receivables"]:
+        for row in getattr(doc, table_field, []) or []:
+            reference_document_type = str(
+                getattr(row, "reference_document_type", "") or ""
+            ).strip()
+            reference_document = str(
+                getattr(row, "reference_document", "") or ""
+            ).strip()
 
+            if cint(getattr(row, "custom_is_manual_row", 0)):
+                if hasattr(row, "status") and not row.status:
+                    row.status = "Settled"
+                continue
 
+            if reference_document_type == "Additional Salary" and reference_document:
+                created_from_fnf = frappe.db.get_value(
+                    "Additional Salary",
+                    reference_document,
+                    "custom_created_from_fnf",
+                )
+
+                if cint(created_from_fnf):
+                    if hasattr(row, "custom_is_manual_row"):
+                        row.custom_is_manual_row = 1
+
+                    if hasattr(row, "status") and not row.status:
+                        row.status = "Settled"
+
+                    continue
+
+            if not reference_document_type and not reference_document:
+                if flt(getattr(row, "amount", 0)) > 0:
+                    if hasattr(row, "custom_is_manual_row"):
+                        row.custom_is_manual_row = 1
+
+                    if hasattr(row, "status") and not row.status:
+                        row.status = "Settled"
 
 
 def populate_full_and_final_doc(doc, method=None):
     log_trace("populate started", {"doc": doc.name, "employee": doc.employee})
+    load_base_document_data(doc)
 
     if not validate_required_values(doc):
         return
+    normalize_paid_via_salary_slip_usage(doc)
+    normalize_manual_settlement_rows(doc)
     validate_accounts_before_finance_approval(doc)
     cancel_deleted_manual_additional_salary_rows(doc)
     validate_no_other_full_and_final_exists(doc)
     validate_if_have_sepration(doc)
-    load_base_document_data(doc)
+    validate_employee_separation_submitted_before_supporting_services_approval(doc)
 
     should_check_open_leaves = doc.is_new()
 
