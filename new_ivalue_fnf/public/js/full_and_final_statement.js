@@ -33,6 +33,7 @@ frappe.ui.form.on("Full and Final Statement", {
     refresh: function (frm) {
 
         clear_placeholder_rows(frm);
+        lock_settlement_date_fields(frm);
         lock_employee_field_when_manual_rows_exist(frm);
         lock_employee_field_after_save(frm);
 
@@ -310,6 +311,16 @@ async function check_if_separatoin_has_been_submited(frm) {
     }
 
 }
+
+function lock_settlement_date_fields(frm) {
+    frm.set_df_property("transaction_date", "read_only", 1);
+    frm.set_df_property("relieving_date", "read_only", !frm.is_new());
+
+    frm.refresh_field("transaction_date");
+    frm.refresh_field("relieving_date");
+}
+
+
 
 function lock_employee_field_if_selected(frm) {
     if (frm.doc.employee) {

@@ -2,8 +2,16 @@ from datetime import date
 
 import frappe
 from frappe import _
-from frappe.utils import cint, flt, get_first_day, getdate, nowdate, relativedelta
-from frappe.utils import flt, date_diff
+from frappe.utils import cint, date_diff, flt, get_first_day, getdate, nowdate, relativedelta
+
+
+# ============================================================
+# FILE GUIDE
+# Purpose: Full and Final Statement backend service.
+# This file validates the document, prepares employee and salary data,
+# builds automatic payable/receivable rows, preserves manual rows,
+# syncs manual rows to Additional Salary, and powers the Explain button.
+# ============================================================
 # ============================================================
 # SECTION 1: Logging Helpers
 # ============================================================
@@ -31,11 +39,13 @@ def get_inclusive_days(start_date, end_date) -> int:
     return (end_value - start_value).days + 1
 
 
+# Returns the first calendar day of the month for the given date.
 def get_month_first_day(any_date) -> date:
     current_date = getdate(any_date)
     return date(current_date.year, current_date.month, 1)
 
 
+# Returns the last calendar day of the month for the given date.
 def get_month_last_day(any_date) -> date:
     current_date = getdate(any_date)
 
@@ -47,12 +57,14 @@ def get_month_last_day(any_date) -> date:
     return next_month_first_day - relativedelta(days=1)
 
 
+# Returns how many days exist in the month of the given date.
 def get_days_in_month(any_date) -> int:
     month_start = get_month_first_day(any_date)
     month_end = get_month_last_day(any_date)
     return (month_end - month_start).days + 1
 
 
+# Calculates how many days two date ranges overlap.
 def get_overlap_days(app_from_date, app_to_date, range_start, range_end) -> int:
     overlap_start = max(getdate(app_from_date), getdate(range_start))
     overlap_end = min(getdate(app_to_date), getdate(range_end))
@@ -63,6 +75,7 @@ def get_overlap_days(app_from_date, app_to_date, range_start, range_end) -> int:
     return (overlap_end - overlap_start).days + 1
 
 
+# Returns the positive day count between two dates without including an invalid reversed range.
 def get_total_days(from_date, to_date) -> int:
     start_date = getdate(from_date)
     end_date = getdate(to_date)
@@ -74,7 +87,7 @@ def get_total_days(from_date, to_date) -> int:
 
 
 # ============================================================
-# SECTION 3: Settings Helpers
+# SECTION 3: Full and Final Settings Helpers
 # ============================================================
 
 
@@ -95,6 +108,7 @@ def get_settings_doc(company: str):
     return frappe.get_doc("Full and Final Settings", settings_name)
 
 
+# Stops processing when the company does not have Full and Final settings configured.
 def validate_full_and_final_settings_exists(company: str):
     if not company:
         frappe.throw(_("Company is required to continue."))
@@ -113,6 +127,7 @@ def validate_full_and_final_settings_exists(company: str):
         )
 
 
+# Finds the settings row for a specific settlement component and company.
 def get_component_setting_for_company(company: str, component_key: str):
     if not company or not component_key:
         return None
@@ -129,6 +144,7 @@ def get_component_setting_for_company(company: str, component_key: str):
     return None
 
 
+# Reads a configurable field from the company Full and Final settings with a fallback value.
 def get_settings_field_value(
     company: str, fieldname: str, default_value: str = ""
 ) -> str:
@@ -145,6 +161,7 @@ def get_settings_field_value(
     return str(value).strip()
 
 
+# Resolves the display label used for a settlement component.
 def get_component_label(company: str, component_key: str, fallback_label: str) -> str:
     setting_row = get_component_setting_for_company(company, component_key)
 
@@ -154,6 +171,7 @@ def get_component_label(company: str, component_key: str, fallback_label: str) -
     return fallback_label
 
 
+# Resolves the account configured for a settlement component.
 def get_component_account(
     company: str, component_key: str, fallback_account: str | None = None
 ) -> str | None:
@@ -168,6 +186,7 @@ def get_component_account(
     return get_company_default_payable_account(company)
 
 
+# Resolves both display label and account for a component using settings and fallback rules.
 def get_component_data(
     company: str, component_key: str, fallback_account: str | None = None
 ) -> dict:
@@ -187,6 +206,7 @@ def get_component_data(
     }
 
 
+# Resolves display name and account for salary components shown in settlement rows.
 def get_component_display_and_account(company: str, salary_type: str):
     component_key = "Additional Salary Earning"
 
@@ -210,7 +230,7 @@ def get_component_display_and_account(company: str, salary_type: str):
 
 
 # ============================================================
-# SECTION 4: Company / Account Helpers
+# SECTION 4: Company, Account, and Cost Center Helpers
 # ============================================================
 
 
@@ -221,6 +241,7 @@ def get_company_currency(company: str) -> str | None:
     return frappe.db.get_value("Company", company, "default_currency")
 
 
+# Reads the default letter head from the Company record.
 def get_company_letter_head(company: str) -> str | None:
     if not company:
         return None
@@ -228,6 +249,7 @@ def get_company_letter_head(company: str) -> str | None:
     return frappe.db.get_value("Company", company, "default_letter_head")
 
 
+# Checks whether an account belongs to the current company and is not a group account.
 def is_valid_company_account(account: str | None, company: str) -> bool:
     """
     التأكد أن الحساب تابع لنفس الشركة وليس Group.
@@ -254,6 +276,7 @@ def is_valid_company_account(account: str | None, company: str) -> bool:
     return True
 
 
+# Gets a safe default payable account for the company.
 def get_company_default_payable_account(company: str) -> str | None:
     if not company:
         return None
@@ -273,6 +296,7 @@ def get_company_default_payable_account(company: str) -> str | None:
     return None
 
 
+# Gets the Employee Advance account configured for the company.
 def get_company_employee_advance_account(company: str) -> str | None:
     if not company:
         return None
@@ -292,6 +316,7 @@ def get_company_employee_advance_account(company: str) -> str | None:
     return None
 
 
+# Checks whether a cost center belongs to the company and can be posted against.
 def is_valid_company_cost_center(cost_center: str | None, company: str) -> bool:
     """
     التأكد أن مركز التكلفة تابع لنفس الشركة وليس Group.
@@ -318,6 +343,7 @@ def is_valid_company_cost_center(cost_center: str | None, company: str) -> bool:
     return True
 
 
+# Finds the default cost center for the company using company settings or active cost centers.
 def get_default_cost_center(company: str) -> str | None:
     """
     جلب Default Cost Center من Full and Final Settings.
@@ -354,7 +380,7 @@ def get_default_cost_center(company: str) -> str | None:
 
 
 # ============================================================
-# SECTION 5: Employee / Salary Helpers
+# SECTION 5: Employee and Salary Helpers
 # ============================================================
 
 
@@ -387,6 +413,7 @@ def get_employee_basic_data(employee: str) -> dict:
     return employee_data
 
 
+# Gets the latest submitted salary structure assignment valid on the selected date.
 def get_latest_salary_structure_assignment(employee: str, as_of_date):
     assignment_name = frappe.db.get_value(
         "Salary Structure Assignment",
@@ -410,6 +437,7 @@ def get_latest_salary_structure_assignment(employee: str, as_of_date):
     return frappe.get_doc("Salary Structure Assignment", assignment_name)
 
 
+# Resolves salary currency from the assignment or its salary structure.
 def get_salary_currency_from_assignment(assignment):
     if not assignment:
         return None
@@ -424,6 +452,7 @@ def get_salary_currency_from_assignment(assignment):
     return frappe.db.get_value("Salary Structure", salary_structure, "currency")
 
 
+# Reads earning components from the assigned salary structure and returns the salary snapshot.
 def get_salary_breakdown(assignment) -> dict:
     if not assignment:
         return {
@@ -449,69 +478,9 @@ def get_salary_breakdown(assignment) -> dict:
 
 
 # ============================================================
-# SECTION 6: Row Builder Helpers
+# SECTION 6: Settlement Row Helpers
 # ============================================================
 
-
-# def append_row(
-#     doc,
-#     table_field: str,
-#     component: str,
-#     amount: float,
-#     account: str | None = None,
-#     reference_document_type: str | None = None,
-#     reference_document: str | None = None,
-#     custom_number_of_days: float = 0,
-#     paid_via_salary_slip: int = 0,
-# ):
-#     if flt(amount) <= 0:
-#         log_trace("skip zero row", {"component": component, "amount": amount})
-#         return
-
-#     row = doc.append(table_field, {})
-#     row.component = component
-#     row.amount = flt(amount, 2)
-#     row.account = account or None   
-#     row.status = "Settled"
-#     row.reference_document_type = reference_document_type
-#     row.reference_document = reference_document
-#     if hasattr(row, "paid_via_salary_slip"):
-#         saved_paid_via_salary_slip = 0
-
-#         paid_via_salary_slip_map = getattr(doc, "_paid_via_salary_slip_map", {}) or {}
-
-#         if reference_document_type and reference_document:
-#             saved_paid_via_salary_slip = cint(
-#                 paid_via_salary_slip_map.get(
-#                     (reference_document_type, reference_document),
-#                     paid_via_salary_slip,
-#                 )
-#             )
-
-#         row.paid_via_salary_slip = saved_paid_via_salary_slip
-
-#     if hasattr(row, "custom_number_of_days"):
-#         row.custom_number_of_days = flt(custom_number_of_days, 2)
-
-#     if hasattr(row, "custom_is_manual_row"):
-#         row.custom_is_manual_row = 0
-
-#     if hasattr(row, "cost_center"):
-#         if (
-#             hasattr(doc, "custom_default_cost_center")
-#             and doc.custom_default_cost_center
-#         ):
-#             row.cost_center = doc.custom_default_cost_center
-#         else:
-#             row.cost_center = frappe.db.get_value("Company", doc.company, "cost_center")
-#     log_trace(
-#         "row appended",
-#         {
-#             "table": table_field,
-#             "component": component,
-#             "amount": row.amount,
-#         },
-#     )
 def build_existing_auto_row_account_map(doc) -> dict:
     account_map = {}
 
@@ -551,6 +520,7 @@ def build_existing_auto_row_account_map(doc) -> dict:
     return account_map
 
 
+# Looks up a previously used account for the same automatic settlement row.
 def get_existing_auto_row_account(
     doc,
     table_field: str,
@@ -588,6 +558,10 @@ def get_existing_auto_row_account(
             return account
 
     return None
+
+
+
+# Appends a payable or receivable row with shared defaults and metadata.
 def append_row(
     doc,
     table_field: str,
@@ -671,6 +645,7 @@ def append_row(
             "account": row.account,
         },
     )
+# Copies employee and company information into the Full and Final document header.
 def apply_document_header(doc, employee_data: dict):
     doc.employee_name = employee_data.get("employee_name")
     doc.company = employee_data.get("company")
@@ -685,6 +660,7 @@ def apply_document_header(doc, employee_data: dict):
     if not doc.relieving_date:
         doc.relieving_date = employee_data.get("relieving_date")
 
+# Copies salary values from the salary assignment into custom fields on the document.
 def apply_salary_snapshot(doc, assignment, salary_data: dict):
     doc.custom_company_currency = get_salary_currency_from_assignment(
         assignment
@@ -697,7 +673,7 @@ def apply_salary_snapshot(doc, assignment, salary_data: dict):
 
 
 # ============================================================
-# SECTION 7: Rebuild Helpers
+# SECTION 7: Manual Row Preservation and Rebuild Helpers
 # ============================================================
 
 
@@ -750,6 +726,7 @@ def get_existing_manual_rows(doc, table_field: str) -> list[dict]:
     return manual_rows
 
 
+# Clears automatic rows from one table while keeping manually entered rows.
 def rebuild_table_keep_manual_only(doc, table_field: str):
     manual_rows = get_existing_manual_rows(doc, table_field)
 
@@ -771,6 +748,7 @@ def rebuild_table_keep_manual_only(doc, table_field: str):
     )
 
 
+# Clears auto-generated payable and receivable rows while preserving manual rows.
 def clear_auto_rows_keep_manual(doc):
     rebuild_table_keep_manual_only(doc, "payables")
     rebuild_table_keep_manual_only(doc, "receivables")
@@ -781,13 +759,14 @@ def clear_auto_rows_keep_manual(doc):
     log_trace("auto rows cleared and manual rows preserved", doc.name)
 
 
+# Clears all automatically rebuilt child tables before recalculation.
 def clear_auto_tables(doc):
     clear_auto_rows_keep_manual(doc)
     log_trace("auto rows cleared and manual rows preserved", doc.name)
 
 
 # ============================================================
-# SECTION 8: Salary Days Builder
+# SECTION 8: Salary Days Settlement Builder
 # ============================================================
 
 
@@ -895,6 +874,7 @@ def get_personal_leave_days_by_type(employee: str, end_date) -> dict:
     return leave_days_by_type
 
 
+# Returns leave types that carry balances forward and are eligible for encashment.
 def get_carry_forward_leave_types():
     return frappe.get_all(
         "Leave Type",
@@ -903,6 +883,7 @@ def get_carry_forward_leave_types():
     )
 
 
+# Finds the latest leave allocation active for the employee and leave type.
 def get_latest_leave_allocation(employee: str, leave_type: str, end_date):
     rows = frappe.get_all(
         "Leave Allocation",
@@ -929,6 +910,7 @@ def get_latest_leave_allocation(employee: str, leave_type: str, end_date):
     return rows[0]
 
 
+# Calculates leave taken in the relevant allocation period up to relieving date.
 def get_leave_taken_days(
     employee: str,
     leave_type: str,
@@ -966,6 +948,7 @@ def get_leave_taken_days(
     taken += flt(personal_leave_days_by_type.get(leave_type, 0))
     return flt(taken, 2)
 
+# Reads the configured annual leave days for the company when available.
 def get_fixed_annual_leave_days_by_company(company: str) -> float:
     if not company:
         return 0
@@ -980,6 +963,7 @@ def get_fixed_annual_leave_days_by_company(company: str) -> float:
         return 14
 
     return 0
+# Builds leave encashment rows and keeps displayed days aligned with the amount calculation.
 def build_leave_encashment_rows(doc):
     setting_row = get_component_setting_for_company(doc.company, "Leaves")
 
@@ -1027,8 +1011,8 @@ def build_leave_encashment_rows(doc):
 
         balance = flt(earned - taken, 2)
 
-        # Add prorated leave earned between the Full and Final transaction date
-        # and the employee relieving date.
+        # Adjust the leave balance using the signed difference between
+        # the transaction date and the employee relieving date.
         if not doc.transaction_date:
             frappe.throw(
                 _("Transaction Date is required before calculating leave balance.")
@@ -1036,10 +1020,9 @@ def build_leave_encashment_rows(doc):
 
         transaction_date = doc.transaction_date
 
-        days_difference = max(
-            date_diff(doc.relieving_date, transaction_date),
-            0,
-        )
+        days_difference = date_diff(doc.relieving_date, transaction_date)
+           
+        
 
         days_in_relieving_month = get_days_in_month(doc.relieving_date)
 
@@ -1102,7 +1085,7 @@ def build_leave_encashment_rows(doc):
         )
 
 # ============================================================
-# SECTION: Unpaid Leave Builder
+# SECTION 10: Unpaid Leave Receivable Builder
 # ============================================================
 
 def get_unpaid_leave_types():
@@ -1112,6 +1095,7 @@ def get_unpaid_leave_types():
         pluck="name",
     )
 
+# Finds approved unpaid leave applications inside the employee clearance period.
 def get_unpaid_leave_rows(employee: str, start_date, end_date) -> list[dict]:
     if not employee or not start_date or not end_date:
         return []
@@ -1179,6 +1163,7 @@ def get_unpaid_leave_rows(employee: str, start_date, end_date) -> list[dict]:
         )
 
     return unpaid_rows
+# Builds receivable rows for unpaid leaves that must be deducted from the settlement.
 def build_unpaid_leave_receivable(doc):
     setting_row = get_component_setting_for_company(doc.company, "Unpaid Leaves")
 
@@ -1244,7 +1229,7 @@ def build_unpaid_leave_receivable(doc):
             },
         )
 # ============================================================
-# SECTION 10: Gratuity Builder
+# SECTION 11: Gratuity Builder
 # ============================================================
 
 def normalize_text(value) -> str:
@@ -1257,6 +1242,7 @@ def normalize_text(value) -> str:
     return str(value).strip()
 
 
+# Applies Saudi gratuity eligibility rules based on service period and leaving reason.
 def is_saudi_gratuity_allowed(
     company_country: str, employment_type: str, reason_of_leaving: str
 ) -> bool:
@@ -1288,6 +1274,7 @@ def is_saudi_gratuity_allowed(
 
     return True
 
+# Calculates the base gratuity value before resignation multipliers are applied.
 def calculate_base_gratuity(
     service_years: int,
     service_months: int,
@@ -1311,6 +1298,7 @@ def calculate_base_gratuity(
     return flt(first_five + remaining, 2)
 
 
+# Builds the gratuity payable row based on company settings and service period.
 def build_gratuity_payable(doc):
     company_country = getattr(doc, "company_country", None)
     employment_type = getattr(doc, "custom_employment_type", None)
@@ -1391,6 +1379,7 @@ def build_gratuity_payable(doc):
     })
 
 
+# Applies resignation rules to reduce or adjust the gratuity amount.
 def apply_resignation_rule(
     amount: float, service_years: float, reason_of_leaving: str
 ) -> float:
@@ -1423,6 +1412,7 @@ def apply_resignation_rule(
     return flt(amount, 2)
 
 
+# Loads the gratuity component setting for the company.
 def get_gratuity_setting(company: str):
     """
     جلب سطر Gratuity من Auto Rows Settings.
@@ -1437,7 +1427,7 @@ def get_gratuity_setting(company: str):
 
 
 # ============================================================
-# SECTION 11: Monthly Additional Salary Builder
+# SECTION 12: Monthly Additional Salary Builder
 # ============================================================
 
 
@@ -1487,6 +1477,7 @@ def get_additional_salary_rows(employee: str, relieving_date):
     return filtered_rows
 
 
+# Builds payable or receivable rows from monthly Additional Salary documents.
 def build_monthly_additional_salary_rows(doc):
     rows = get_additional_salary_rows(doc.employee, doc.relieving_date)
 
@@ -1541,7 +1532,7 @@ def build_monthly_additional_salary_rows(doc):
 
 
 # ============================================================
-# SECTION 12: Outstanding Items Builders
+# SECTION 13: Outstanding Items Builders
 # ============================================================
 
 
@@ -1579,6 +1570,7 @@ def get_open_employee_advances(employee: str):
     return rows
 
 
+# Finds unpaid expense claims that should be paid in the settlement.
 def get_open_expense_claims(employee: str):
     if not employee:
         return []
@@ -1604,6 +1596,7 @@ def get_open_expense_claims(employee: str):
     return rows
 
 
+# Builds receivable rows for outstanding employee advances.
 def build_employee_advance_rows(doc):
     component_data = get_component_data(
         company=doc.company,
@@ -1657,6 +1650,7 @@ def build_employee_advance_rows(doc):
         )
 
 
+# Builds payable rows for approved outstanding expense claims.
 def build_expense_claim_rows(doc):
     component_data = get_component_data(
         company=doc.company,
@@ -1703,10 +1697,11 @@ def build_expense_claim_rows(doc):
 
 
 # ============================================================
-# SECTION 13: Manual Rows / Additional Salary Sync
+# SECTION 14: Manual Rows and Additional Salary Sync
 # ============================================================
 
 @frappe.whitelist()
+# Finds manual Full and Final rows already linked to the employee.
 def get_employee_fnf_manual_rows(employee: str, company: str = None):
     if not employee:
         return {
@@ -1762,6 +1757,7 @@ def get_employee_fnf_manual_rows(employee: str, company: str = None):
         "payables": payables,
         "receivables": receivables,
     }
+# Converts a child table name into the expected manual row type.
 def get_manual_row_type_from_table_name(table_name: str) -> str | None:
     if table_name == "Payables":
         return "Payables Manual Row"
@@ -1772,6 +1768,7 @@ def get_manual_row_type_from_table_name(table_name: str) -> str | None:
     return None
 
 
+# Loads company settings for manual payable or receivable rows.
 def get_manual_row_setting(company: str, row_type: str):
     settings_doc = get_settings_doc(company)
 
@@ -1787,6 +1784,7 @@ def get_manual_row_setting(company: str, row_type: str):
     return None
 
 
+# Returns whether a manual row table expects an earning or deduction component.
 def get_expected_salary_component_type(table_name: str) -> str | None:
     if table_name == "Payables":
         return "Earning"
@@ -1797,6 +1795,7 @@ def get_expected_salary_component_type(table_name: str) -> str | None:
     return None
 
 
+# Ensures the selected salary component matches the manual row table type.
 def validate_salary_component_type(salary_component: str, expected_type: str):
     if not salary_component:
         frappe.throw(_("Salary Component is required in Full and Final Settings."))
@@ -1819,44 +1818,9 @@ def validate_salary_component_type(salary_component: str, expected_type: str):
             )
         )
 
-# @frappe.whitelist()
-# def ensure_employee_relieving_date(employee: str, relieving_date: str = None):
-#     if not employee:
-#         frappe.throw(_("Employee is required."))
-
-#     employee_relieving_date = frappe.db.get_value(
-#         "Employee",
-#         employee,
-#         "relieving_date",
-#     )
-
-#     if employee_relieving_date:
-#         return {
-#             "status": "ok",
-#             "relieving_date": employee_relieving_date,
-#         }
-
-#     if not relieving_date:
-#         frappe.throw(
-#             _("Set Relieving Date for Employee: {0}").format(employee)
-#         )
-
-#     frappe.db.set_value(
-#         "Employee",
-#         employee,
-#         "relieving_date",
-#         relieving_date,
-#         update_modified=False,
-#     )
-
-#     frappe.clear_cache(doctype="Employee", name=employee)
-
-#     return {
-#         "status": "updated",
-#         "relieving_date": relieving_date,
-#     }
 
 @frappe.whitelist()
+# Resolves default account, cost center, and salary component values for manual rows.
 def get_manual_row_defaults(
     company: str,
     table_name: str,
@@ -1896,6 +1860,7 @@ def get_manual_row_defaults(
     }
 
 
+# Detects whether a settlement row already has a linked manual Additional Salary document.
 def is_manual_additional_salary_row(row) -> bool:
     if not cint(getattr(row, "custom_is_manual_row", 0)):
         return False
@@ -1908,6 +1873,7 @@ def is_manual_additional_salary_row(row) -> bool:
     return True
 
 
+# Creates the Additional Salary document behind a manual settlement row.
 def create_manual_additional_salary(
     employee: str,
     company: str,
@@ -1935,6 +1901,7 @@ def create_manual_additional_salary(
     return additional_salary_doc
 
 
+# Cancels a linked Additional Salary document when a manual row is removed or changed.
 def cancel_additional_salary_if_needed(additional_salary_name: str):
     if not additional_salary_name:
         return
@@ -1949,6 +1916,7 @@ def cancel_additional_salary_if_needed(additional_salary_name: str):
         additional_salary_doc.cancel()
 
 
+# Syncs manual rows from one settlement table to Additional Salary documents.
 def sync_manual_rows_for_table(doc, table_field: str, table_name: str):
     row_type = get_manual_row_type_from_table_name(table_name)
     expected_type = get_expected_salary_component_type(table_name)
@@ -2011,6 +1979,7 @@ def sync_manual_rows_for_table(doc, table_field: str, table_name: str):
         row.custom_is_manual_row = 1
 
 
+# Syncs all manual payable and receivable rows to Additional Salary documents.
 def sync_manual_rows_to_additional_salary(doc):
     sync_manual_rows_for_table(
         doc=doc,
@@ -2024,6 +1993,7 @@ def sync_manual_rows_to_additional_salary(doc):
         table_name="Receivables",
     )
 
+# Cancels linked manual Additional Salary records when the Full and Final document is deleted.
 def cancel_fnf_manual_additional_salaries_on_delete(doc, method=None):
     for row in (doc.payables or []) + (doc.receivables or []):
         reference_document_type = str(getattr(row, "reference_document_type", "") or "").strip()
@@ -2037,6 +2007,7 @@ def cancel_fnf_manual_additional_salaries_on_delete(doc, method=None):
 
         cancel_additional_salary_if_needed(reference_document)
         
+# Cancels linked manual Additional Salary records when the Full and Final document is cancelled.
 def cancel_fnf_manual_additional_salaries(doc, method=None):
     for row in (doc.payables or []) + (doc.receivables or []):
         reference_document_type = str(
@@ -2054,6 +2025,7 @@ def cancel_fnf_manual_additional_salaries(doc, method=None):
             continue
 
         cancel_additional_salary_if_needed(reference_document)
+# Cancels Additional Salary documents whose manual settlement rows were removed.
 def cancel_deleted_manual_additional_salary_rows(doc):
     old_doc = doc.get_doc_before_save()
 
@@ -2093,7 +2065,7 @@ def cancel_deleted_manual_additional_salary_rows(doc):
 
 
 # ============================================================
-# SECTION 14: Main Service / Hook Methods
+# SECTION 15: Validations and Main Hook Methods
 # ============================================================
 
 
@@ -2112,6 +2084,7 @@ def set_transaction_date(doc, method=None):
             doc.relieving_date = employee_relieving_date
 
 
+# Validates the minimum employee, date, and company values required for calculation.
 def validate_required_values(doc):
     if not doc.employee:
         log_trace("skip build because employee is empty")
@@ -2131,6 +2104,7 @@ def validate_required_values(doc):
 
     return True
 
+# Blocks settlement creation when pending leave applications exist inside the clearance period.
 def validate_no_open_leave_applications_in_clearance_period(doc):
     if not doc.employee or not doc.relieving_date:
         return
@@ -2177,6 +2151,7 @@ def validate_no_open_leave_applications_in_clearance_period(doc):
             "Cannot create Full and Final Statement. The employee has pending leave application(s) during the clearance month ({0} to {1}): {2}. Please approve, reject, or cancel them first."
         ).format(clearance_start, clearance_end, leave_list)
     )
+# Calculates service years, months, days, and total service years for the document.
 def apply_service_period(doc):
     
     if not doc.date_of_joining or not doc.relieving_date:
@@ -2214,10 +2189,12 @@ def apply_service_period(doc):
         },
     )
 
+# Returns workflow states that should be treated as closed for duplicate checks.
 def get_closed_workflow_states():
     return ["Cancel", "Signed"]
 
 
+# Prevents creating another open Full and Final Statement for the same employee.
 def validate_no_other_full_and_final_exists(doc):
     if not doc.employee:
         return
@@ -2251,6 +2228,7 @@ def validate_no_other_full_and_final_exists(doc):
     )
 
 
+# Loads employee and salary base data used by the rest of the calculation flow.
 def load_base_document_data(doc):
     employee_data = get_employee_basic_data(doc.employee)
 
@@ -2288,6 +2266,7 @@ def load_base_document_data(doc):
 #validate if employee have opened doc 
 
 @frappe.whitelist()
+# Finds an existing open Full and Final Statement for duplicate prevention.
 def get_existing_full_and_final_for_employee(employee: str, current_docname: str = None):
     if not employee:
         return None
@@ -2318,6 +2297,7 @@ def get_existing_full_and_final_for_employee(employee: str, current_docname: str
     
 # get employee spearation
 @frappe.whitelist()
+# Finds the Employee Separation document required before creating Full and Final.
 def get_employee_separation_for_full_and_final(employee: str):
     if not employee:
         return None
@@ -2340,6 +2320,7 @@ def get_employee_separation_for_full_and_final(employee: str):
         "name": separation.name,
         "docstatus": separation.docstatus,
     }
+# Links the Employee Separation document or stops creation if none exists.
 def validate_if_have_sepration(doc):
     separation = get_employee_separation_for_full_and_final(doc.employee)
 
@@ -2353,6 +2334,7 @@ def validate_if_have_sepration(doc):
 
     if hasattr(doc, "custom_employee_separation"):
         doc.custom_employee_separation = separation.get("name")
+# Ensures Employee Separation is submitted before the final supporting-services workflow approval.
 def validate_employee_separation_submitted_before_supporting_services_approval(doc):
     previous_doc = doc.get_doc_before_save()
 
@@ -2401,6 +2383,7 @@ def validate_employee_separation_submitted_before_supporting_services_approval(d
                 "Employee Separation {0} must be submitted before approving this Full and Final Statement."
             ).format(doc.custom_employee_separation)
         )
+# Ensures all payable and receivable rows have accounts before finance approval.
 def validate_accounts_before_finance_approval(doc):
     previous_doc = doc.get_doc_before_save()
 
@@ -2475,16 +2458,13 @@ def validate_accounts_before_finance_approval(doc):
             ).format("<br>".join(account_issues))
         )
 # ============================================================
-# Auto Pull Rebuild Control
-# Return True if the row was generated automatically from a source document.
-
-#     Auto rows have:
-#     - reference_document_type
-#     - reference_document
-#     - custom_is_manual_row = 0
-
-#     Manual rows must not be treated as auto rows.
+# SECTION 16: Auto Pull Rebuild Control
+# Purpose: Decide when automatic settlement rows should be rebuilt
+# while keeping manual rows and existing user edits stable.
 # ============================================================
+
+
+# Returns True when a row was generated automatically from a source document.
 def is_auto_pull_row(row) -> bool:
     
     if cint(getattr(row, "custom_is_manual_row", 0)):
@@ -2501,6 +2481,7 @@ def is_auto_pull_row(row) -> bool:
     return bool(reference_document_type and reference_document)
 
 
+# Checks whether the document already contains automatically generated rows.
 def has_auto_pull_rows(doc) -> bool:
     """
     Check if the document currently has any auto pulled rows.
@@ -2513,6 +2494,7 @@ def has_auto_pull_rows(doc) -> bool:
     return False
 
 
+# Decides whether automatic rows should be fetched or rebuilt on this save.
 def should_fetch_auto_pull_rows(doc) -> bool:
     """
     Fetch auto rows only:
@@ -2526,10 +2508,12 @@ def should_fetch_auto_pull_rows(doc) -> bool:
 
 
 
+# Normalizes salary-slip flags so receivable rows do not carry unsupported behavior.
 def normalize_paid_via_salary_slip_usage(doc):
     for row in doc.receivables or []:
         if hasattr(row, "paid_via_salary_slip"):
             row.paid_via_salary_slip = 0
+# Marks user-entered rows as manual and fills safe defaults when needed.
 def normalize_manual_settlement_rows(doc):
     for table_field in ["payables", "receivables"]:
         for row in getattr(doc, table_field, []) or []:
@@ -2570,6 +2554,7 @@ def normalize_manual_settlement_rows(doc):
                         row.status = "Settled"
 
 
+# Main hook that validates, loads data, rebuilds rows, and recalculates totals.
 def populate_full_and_final_doc(doc, method=None):
     log_trace("populate started", {"doc": doc.name, "employee": doc.employee})
     load_base_document_data(doc)
@@ -2591,9 +2576,34 @@ def populate_full_and_final_doc(doc, method=None):
             doc.has_value_changed("employee")
             or doc.has_value_changed("relieving_date")
         )
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
 
-    if should_check_open_leaves:
-        validate_no_open_leave_applications_in_clearance_period(doc)
+    # if should_check_open_leaves:
+    #     validate_no_open_leave_applications_in_clearance_period(doc)
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     paid_via_salary_slip_map = {}
 
     for row in (doc.payables or []) + (doc.receivables or []):
@@ -2659,6 +2669,7 @@ def populate_full_and_final_doc(doc, method=None):
 
 
 
+# Whitelisted method to rebuild an already saved Full and Final document.
 def rebuild_saved_full_and_final_statement(docname: str):
     """
     إعادة بناء Full and Final Statement بعد أول حفظ.
@@ -2676,6 +2687,7 @@ def rebuild_saved_full_and_final_statement(docname: str):
 
     log_trace("background rebuild finished", doc.name)
 
+# Recalculates payable, receivable, and asset totals from child rows.
 def apply_totals(doc):
     total_payables = 0
     total_receivables = 0
@@ -2692,6 +2704,14 @@ def apply_totals(doc):
     doc.total_payable_amount = flt(total_payables, 2)
     doc.total_receivable_amount = flt(total_receivables, 2)
 @frappe.whitelist()
+# ============================================================
+# SECTION 17: Explain Amount API and Explanation Helpers
+# Purpose: Build the data shown by the Explain button for every
+# settlement component without changing saved amounts.
+# ============================================================
+
+
+# Routes the Explain button request to the matching component explanation function.
 def explain_settlement_amount(doc_json: str, row_json: str, table_field: str):
     if not doc_json:
         frappe.throw(_("Document data is required."))
@@ -2788,6 +2808,7 @@ def explain_settlement_amount(doc_json: str, row_json: str, table_field: str):
     }
 
 
+# Explains the salary-days amount calculation.
 def explain_salary_days_amount(
     doc,
     component: str,
@@ -2832,6 +2853,7 @@ def explain_salary_days_amount(
     }
 
 
+# Formats leave day decimals into days and hours for the explanation view.
 def format_leave_days_as_days_and_hours(days_value: float) -> str:
     days_value = flt(days_value, 2)
 
@@ -2860,6 +2882,7 @@ def format_leave_days_as_days_and_hours(days_value: float) -> str:
     return "{0} ({1} days)".format(" and ".join(parts), days_value)
 
 
+# Explains leave encashment days, proration, rate, and final amount.
 def explain_leave_amount(
     doc,
     component: str,
@@ -2954,10 +2977,9 @@ def explain_leave_amount(
 
     transaction_date = doc.transaction_date
 
-    days_difference = max(
-        date_diff(doc.relieving_date, transaction_date),
-        0,
-    )
+    days_difference = date_diff(doc.relieving_date, transaction_date)
+       
+    
 
     days_in_relieving_month = get_days_in_month(doc.relieving_date)
 
@@ -3187,6 +3209,7 @@ def explain_leave_amount(
 #             },
 #         ],
     }
+# Explains unpaid leave deduction rows and their overlap calculations.
 def explain_unpaid_leave_application_amount(
     doc,
     component: str,
@@ -3293,6 +3316,7 @@ def explain_unpaid_leave_application_amount(
         ],
     }
 
+# Explains Additional Salary rows pulled into the settlement.
 def explain_additional_salary_amount(
     component: str, amount: float, reference_document: str, table_field: str
 ):
@@ -3373,6 +3397,7 @@ def explain_additional_salary_amount(
     }
 
 
+# Explains Employee Advance recovery rows.
 def explain_employee_advance_amount(
     component: str, amount: float, reference_document: str
 ):
@@ -3460,6 +3485,7 @@ def explain_employee_advance_amount(
     }
 
 
+# Explains gratuity eligibility, base value, multipliers, and final amount.
 def explain_gratuity_amount(doc, component: str, amount: float):
     company_country = getattr(doc, "company_country", None)
 
@@ -3676,6 +3702,7 @@ def explain_gratuity_amount(doc, component: str, amount: float):
     }
 
 
+# Returns the gratuity multiplier based on resignation service-period rules.
 def get_resignation_multiplier(service_years: float, reason_of_leaving: str) -> float:
     if normalize_text(reason_of_leaving) not in [
         "Resignation",
@@ -3695,6 +3722,7 @@ def get_resignation_multiplier(service_years: float, reason_of_leaving: str) -> 
     return 1
 
 
+# Returns human-readable resignation rule text for the Explain view.
 def get_resignation_rule_text(service_years: float, reason_of_leaving: str) -> str:
     if normalize_text(reason_of_leaving) not in [
         "Resignation",
@@ -3715,6 +3743,7 @@ def get_resignation_rule_text(service_years: float, reason_of_leaving: str) -> s
     return "Reason of leaving uses resignation rule with 10 years or more: employee gets full gratuity."
 
 
+# Explains manually entered settlement rows.
 def explain_manual_row(doc, row_data: dict, table_field: str):
     component = str(row_data.get("component") or "").strip()
     amount = flt(row_data.get("amount"), 2)
@@ -3761,3 +3790,4 @@ def explain_manual_row(doc, row_data: dict, table_field: str):
             },
         ],
     }
+
