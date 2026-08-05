@@ -421,8 +421,7 @@ frappe.ui.form.on("Full and Final Outstanding Statement", {
             frappe.msgprint({
                 title: __("Not Allowed"),
                 message: __(
-                    "Paid via Salary Slip can only be used for Payable rows. Receivable rows are still included by the standard Journal Entry creation."
-                ),
+"System Notice: Paid via Salary Slip is supported only for Payable rows. Enabling it does not automatically remove the amount from the standard Journal Entry. The field appears under Receivables only because both row types share the same child-table structure."                ),
                 indicator: "orange"
             });
         }
