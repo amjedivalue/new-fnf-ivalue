@@ -3005,7 +3005,9 @@ def explain_leave_amount(
             daily_leave_accrual * (days_difference),
             2,
         )
-    remaining_leaves = flt(old_remaining_leaves + additional_leave_balance, 2)
+    # The FnF leave row is a snapshot created on the first save.
+    # Do not recalculate the final leave balance when explaining it.
+    remaining_leaves = flt(custom_number_of_days, 2)
 
 
     return {
@@ -3086,14 +3088,10 @@ def explain_leave_amount(
             additional_leave_balance,
         ),
     },
-    {
-        "label": "Final Leave Balance Formula",
-        "value": "{0} + {1} = {2}".format(
-            old_remaining_leaves,
-            additional_leave_balance,
-            remaining_leaves,
-        ),
-    },
+   {
+    "label": "Final Leave Balance",
+    "value": remaining_leaves,
+},
     {
         "label": "Daily Salary Rate",
         "value": "{0} / 30 = {1}".format(
