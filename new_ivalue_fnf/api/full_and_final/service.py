@@ -2588,8 +2588,8 @@ def populate_full_and_final_doc(doc, method=None):
         
         
 
-    # if should_check_open_leaves:
-    #     validate_no_open_leave_applications_in_clearance_period(doc)
+    if should_check_open_leaves:
+        validate_no_open_leave_applications_in_clearance_period(doc)
     
     
     
