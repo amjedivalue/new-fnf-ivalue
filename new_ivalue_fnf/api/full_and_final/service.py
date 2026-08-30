@@ -844,13 +844,15 @@ def get_personal_leave_days_by_type(employee: str, end_date) -> dict:
     if not employee or not end_date:
         return {}
 
-    month_start = get_first_day(getdate(end_date))
+  
+    end_date = getdate(end_date)
+    year_start = getdate(f"{end_date.year}-01-01")
 
     personal_leaves = frappe.get_all(
         "Personal Leave",
         filters={
             "employee": employee,
-            "date": ["between", [month_start, end_date]],
+            "date": ["between", [year_start, end_date]],
             "docstatus": 1,
         },
         fields=["leave_type", "hours"],
