@@ -132,10 +132,26 @@ def fetch_zoho_doc(name):
         docstatus=doc.docstatus
     )
     zoho_status = zoho.fetch_zoho_status()
-    if zoho_status["status"] == 200:
-        update_workfow_status(doc, zoho_status["zoho_status"])
-        return {"status": 200, "message": "status has been updated successfully"}
+    if zoho_status.get("status") == 200:
+        update_workfow_status(
+            doc,
+            zoho_status.get("zoho_status")
+        )
 
+        return {
+            "status": 200,
+            "message": "Status has been updated successfully"
+        }
+
+    frappe.log_error(
+        title=f"FNF Zoho Status Error - {doc.name}",
+        message=frappe.as_json(zoho_status, indent=2)
+    )
+
+    return {
+        "status": zoho_status.get("status", 500),
+        "message": zoho_status.get("message", "Unable to fetch Zoho status")
+    }
 
 def cancel_doc_type(name):
     frappe.db.set_value("Full and Final Statement", name, "workflow_state", "Cancel")
