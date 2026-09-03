@@ -2569,7 +2569,7 @@ def populate_full_and_final_doc(doc, method=None):
     cancel_deleted_manual_additional_salary_rows(doc)
     validate_no_other_full_and_final_exists(doc)
     validate_if_have_sepration(doc)
-    # validate_employee_separation_submitted_before_supporting_services_approval(doc)
+    validate_employee_separation_submitted_before_supporting_services_approval(doc)
 
     should_check_open_leaves = doc.is_new()
 
