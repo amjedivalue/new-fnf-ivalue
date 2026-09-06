@@ -35,8 +35,8 @@ def add_assigened_to(name, workflow_state):
     match (workflow_state):
         case "Pending Finance Director":
             status = "Accounts Manager"
-        case "Pending Supporting Services Directorr":
-            status = "Supporting Services Director"
+        case "Pending CEO":
+            status = "CEO"
         case "HR Manager":
             status = "HR Manager"
         case "Accountant":
@@ -171,7 +171,7 @@ def update_workfow_status(doc, zoho_status):
             "Full and Final Statement",
             doc.name,
             "workflow_state",
-            "Pending Supporting Services Director",
+            "Pending CEO",
         )
         frappe.db.set_value("Full and Final Statement", doc.name, "zoho_id", "")
         frappe.db.set_value("Full and Final Statement", doc.name, "docstatus", 0)

@@ -100,7 +100,7 @@ fixtures = [
                     "HR Manager",
                     "Accountant", 
                     "Pending Finance Director",
-                    "Pending Supporting Services Director",
+                    "Pending CEO",
                     "Employee Sigen",
                     "Signed",
                     "Cancel",

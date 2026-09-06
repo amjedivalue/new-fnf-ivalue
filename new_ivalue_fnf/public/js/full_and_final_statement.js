@@ -176,7 +176,7 @@ validate: function (frm) {
     //     ) {
     //         validate_accounts_before_finance_approval(frm);
     //     }
-    //     if (frm.doc.workflow_state === "Pending Supporting Services Director") {
+    //     if (frm.doc.workflow_state === "Pending CEO") {
     //         if (frm.selected_workflow_action === "Approve") {
     //             await check_if_separatoin_has_been_submited(frm)
     //         }

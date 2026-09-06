@@ -2346,7 +2346,7 @@ def validate_employee_separation_submitted_before_supporting_services_approval(d
     previous_state = getattr(previous_doc, "workflow_state", None)
     current_state = getattr(doc, "workflow_state", None)
 
-    if previous_state != "Pending Supporting Services Director":
+    if previous_state != "Pending CEO":
         return
 
     if current_state == previous_state:

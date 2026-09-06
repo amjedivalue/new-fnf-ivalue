@@ -35,7 +35,7 @@ def update_workfow_status(name, zoho_status):
         frappe.db.commit()
         return "completed"
     elif zoho_status == "declined":
-        frappe.db.set_value('Full and Final Statement', name, 'workflow_state', 'Pending Supporting Services Director')
+        frappe.db.set_value('Full and Final Statement', name, 'workflow_state', 'Pending CEO')
         frappe.db.set_value('Full and Final Statement', name, 'zoho_id', '')
         frappe.db.set_value('Full and Final Statement', name, 'docstatus', 0)
         frappe.db.commit() 
